@@ -12,6 +12,7 @@
   color: white;
   font-weight: bold;
   margin-bottom: 2rem;
+  gap: 1rem; 
 }
 
 .board {
@@ -69,4 +70,21 @@
 }
 .possible-move {
   outline: 3px dashed limegreen;
+}
+.new-game-icon {
+  width: 1.6rem;
+  height: 1.6rem;
+  cursor: pointer;
+  color: #93c5fd;
+  transition: transform 0.3s ease;
+  margin-top: 0.2rem; /* adjust vertically if needed */
+}
+
+.new-game-icon:hover {
+  transform: rotate(90deg);
+}
+.title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
 }

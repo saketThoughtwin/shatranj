@@ -12,7 +12,7 @@ import wb from "../../assets/wB.svg";
 import wn from "../../assets/wN.svg";
 import wp from "../../assets/wP.svg";
 import "./ChessGame.css";
-
+import { RefreshCcw } from "lucide-react";
 const pieceIcons: Record<string, string> = {
   K: wk,
   Q: wq,
@@ -102,7 +102,14 @@ export default function ChessGame() {
       }
     }
   };
-
+  const handleNewGame = () => {
+    setBoard(initialBoard);
+    setTurn("white");
+    setSelected(null);
+    setGameOver(false);
+    setWinner(null);
+    setPossibleMoves([]);
+  };
   useEffect(() => {
     if (turn === "black" && !gameOver) {
       setTimeout(() => {
@@ -127,9 +134,40 @@ export default function ChessGame() {
     }
   }, [turn]);
 
+  const audio = new Audio(
+    "https://res.cloudinary.com/ddfp1evfo/video/upload/v1750240572/knight-hood-240830_x1dqtn.mp3"
+  );
+
+  useEffect(() => {
+    audio.loop = true;
+    const playMusic = async () => {
+      try {
+        await audio.play();
+      } catch (err) {
+        console.warn("User interaction needed to start music:", err);
+      }
+    };
+    playMusic();
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+    };
+  }, []);
+
   return (
     <div className="game-wrapper">
-      <h1 className="title">♟️ Shatranj</h1>
+      <div className="game-header">
+        <h1 className="title">
+          <span className="title-group">
+            ♟️ Shatranj
+            <RefreshCcw
+              className="new-game-icon"
+              title="New Game"
+              onClick={handleNewGame}
+            />
+          </span>
+        </h1>
+      </div>
       <div className="board">
         {board.map((row, rowIndex) =>
           row.map((piece, colIndex) => {
@@ -167,7 +205,6 @@ export default function ChessGame() {
     </div>
   );
 }
-
 function evaluateBoard(board: string[][]): number {
   let score = 0;
   for (let i = 0; i < 8; i++) {
@@ -203,7 +240,11 @@ function minimaxRoot(board: string[][], depth: number, isMaximizing: boolean) {
   return { move: bestMove, value: bestEval };
 }
 
-function minimax(board: string[][], depth: number, isMaximizing: boolean): number {
+function minimax(
+  board: string[][],
+  depth: number,
+  isMaximizing: boolean
+): number {
   if (depth === 0) return evaluateBoard(board);
   const moves = getAllLegalMoves(board, isMaximizing);
   if (moves.length === 0) return evaluateBoard(board);
@@ -226,14 +267,20 @@ function getAllLegalMoves(board: string[][], isWhiteTurn: boolean): Move[] {
       const piece = board[i][j];
       if ((isWhiteTurn && isWhite(piece)) || (!isWhiteTurn && isBlack(piece))) {
         const pseudoMoves = getPseudoLegalMoves(board, i, j);
-        pseudoMoves.forEach(([r, c]) => moves.push({ from: [i, j], to: [r, c] }));
+        pseudoMoves.forEach(([r, c]) =>
+          moves.push({ from: [i, j], to: [r, c] })
+        );
       }
     }
   }
   return moves;
 }
 
-function getPseudoLegalMoves(board: string[][], row: number, col: number): [number, number][] {
+function getPseudoLegalMoves(
+  board: string[][],
+  row: number,
+  col: number
+): [number, number][] {
   const moves: [number, number][] = [];
   const piece = board[row][col];
   const lower = piece.toLowerCase();
@@ -301,8 +348,14 @@ function getPseudoLegalMoves(board: string[][], row: number, col: number): [numb
 
   if (lower === "n") {
     for (const [dx, dy] of [
-      [2, 1], [2, -1], [-2, 1], [-2, -1],
-      [1, 2], [-1, 2], [1, -2], [-1, -2],
+      [2, 1],
+      [2, -1],
+      [-2, 1],
+      [-2, -1],
+      [1, 2],
+      [-1, 2],
+      [1, -2],
+      [-1, -2],
     ]) {
       const r = row + dx;
       const c = col + dy;
@@ -314,8 +367,14 @@ function getPseudoLegalMoves(board: string[][], row: number, col: number): [numb
 
   if (lower === "k") {
     for (const [dx, dy] of [
-      [0, 1], [0, -1], [1, 0], [-1, 0],
-      [1, 1], [-1, -1], [1, -1], [-1, 1],
+      [0, 1],
+      [0, -1],
+      [1, 0],
+      [-1, 0],
+      [1, 1],
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
     ]) {
       const r = row + dx;
       const c = col + dy;
