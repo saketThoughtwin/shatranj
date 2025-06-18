@@ -1,0 +1,11 @@
+@import "tailwindcss/preflight";
+@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Optional: set full height */
+html,
+body,
+#root {
+  height: 100%;
+}

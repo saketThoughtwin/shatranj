@@ -1,0 +1,72 @@
+.game-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  background: radial-gradient(#1f2937, #111827);
+  min-height: 100vh;
+}
+
+.title {
+  font-size: 2.5rem;
+  color: white;
+  font-weight: bold;
+  margin-bottom: 2rem;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 70px);
+  grid-template-rows: repeat(8, 70px);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+  border: 4px solid #374151;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.square {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.light {
+  background-color: #f0d9b5;
+}
+
+.dark {
+  background-color: #b58863;
+}
+
+.selected {
+  outline: 3px solid yellow;
+}
+
+.piece {
+  width: 45px;
+  height: 45px;
+  object-fit: contain;
+}
+
+.result-banner {
+  margin-top: 2rem;
+  padding: 1rem 2rem;
+  background-color: #16a34a;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border-radius: 8px;
+}
+.square.possible-move {
+  outline: 3px solid #2e7d32; /* green highlight */
+  outline-offset: -2px;
+}
+.square.selected {
+  outline: 3px solid #1976d2; /* blue highlight */
+  outline-offset: -2px;
+}
+.possible-move {
+  outline: 3px dashed limegreen;
+}
