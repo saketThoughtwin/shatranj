@@ -13,6 +13,16 @@ import wn from "../../assets/wN.svg";
 import wp from "../../assets/wP.svg";
 import "./ChessGame.css";
 import { RefreshCcw } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+
 const pieceIcons: Record<string, string> = {
   K: wk,
   Q: wq,
@@ -40,12 +50,12 @@ const initialBoard = [
 ];
 
 const pieceScore: Record<string, number> = {
-  p: 1,
-  n: 3,
-  b: 3,
-  r: 5,
-  q: 9,
-  k: 1000,
+  p: 100,
+  n: 320,
+  b: 330,
+  r: 500,
+  q: 900,
+  k: 20000,
 };
 
 function isWhite(piece: string) {
@@ -55,6 +65,25 @@ function isBlack(piece: string) {
   return piece === piece.toLowerCase() && piece !== "";
 }
 
+function findKing(
+  board: string[][],
+  isWhiteTurn: boolean
+): [number, number] | null {
+  const target = isWhiteTurn ? "K" : "k";
+  for (let i = 0; i < 8; i++)
+    for (let j = 0; j < 8; j++) if (board[i][j] === target) return [i, j];
+  return null;
+}
+
+function isKingInCheck(board: string[][], isWhiteTurn: boolean): boolean {
+  const kingPos = findKing(board, isWhiteTurn);
+  if (!kingPos) return false;
+  const attackers = getAllLegalMoves(board, !isWhiteTurn);
+  return attackers.some(
+    (m) => m.to[0] === kingPos[0] && m.to[1] === kingPos[1]
+  );
+}
+
 export default function ChessGame() {
   const [board, setBoard] = useState(initialBoard);
   const [selected, setSelected] = useState<[number, number] | null>(null);
@@ -62,35 +91,41 @@ export default function ChessGame() {
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
   const [possibleMoves, setPossibleMoves] = useState<[number, number][]>([]);
+  const [thinking, setThinking] = useState(false);
+  const [check, setCheck] = useState(false);
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 
   const handleClick = (row: number, col: number) => {
-    if (gameOver || turn !== "white") return;
-
+    if (gameOver || turn !== "white" || thinking) return;
     const piece = board[row][col];
 
     if (selected) {
       const [fromRow, fromCol] = selected;
       const selectedPiece = board[fromRow][fromCol];
+      const legal = getPseudoLegalMoves(board, fromRow, fromCol);
+      if (legal.some(([r, c]) => r === row && c === col)) {
+        const newBoard = board.map((r) => [...r]);
+        let movedPiece = selectedPiece;
 
-      if (isWhite(selectedPiece)) {
-        const legal = getPseudoLegalMoves(board, fromRow, fromCol);
-        if (legal.some(([r, c]) => r === row && c === col)) {
-          const newBoard = board.map((r) => [...r]);
-          const captured = newBoard[row][col];
-          newBoard[row][col] = selectedPiece;
-          newBoard[fromRow][fromCol] = "";
-          setBoard(newBoard);
-          setSelected(null);
-          setPossibleMoves([]);
+        // Promotion
+        if (movedPiece === "P" && row === 0) movedPiece = "Q";
+        if (movedPiece === "p" && row === 7) movedPiece = "q";
 
-          if (captured === "k") {
-            setGameOver(true);
-            setWinner("White");
-          } else {
-            setTurn("black");
-          }
-          return;
+        const captured = newBoard[row][col];
+        newBoard[row][col] = movedPiece;
+        newBoard[fromRow][fromCol] = "";
+        setBoard(newBoard);
+        setSelected(null);
+        setPossibleMoves([]);
+
+        if (captured === "k") {
+          setGameOver(true);
+          setWinner("White");
+        } else {
+          setTurn("black");
+          setCheck(isKingInCheck(newBoard, false));
         }
+        return;
       }
       setSelected(null);
       setPossibleMoves([]);
@@ -102,6 +137,7 @@ export default function ChessGame() {
       }
     }
   };
+
   const handleNewGame = () => {
     setBoard(initialBoard);
     setTurn("white");
@@ -109,31 +145,53 @@ export default function ChessGame() {
     setGameOver(false);
     setWinner(null);
     setPossibleMoves([]);
+    setThinking(false);
+    setCheck(false);
+    setConfirmModalOpen(false);
   };
+
   useEffect(() => {
     if (turn === "black" && !gameOver) {
+      setThinking(true);
       setTimeout(() => {
-        const { move } = minimaxRoot(board, 2, false);
-        if (!move) return;
-
+        const { move } = minimaxRoot(board, 3, false);
+        if (!move) {
+          setThinking(false);
+          return;
+        }
         const newBoard = board.map((r) => [...r]);
-        const [fromRow, fromCol] = move.from;
-        const [toRow, toCol] = move.to;
-        const captured = newBoard[toRow][toCol];
-        newBoard[toRow][toCol] = newBoard[fromRow][fromCol];
-        newBoard[fromRow][fromCol] = "";
+        let movedPiece = newBoard[move.from[0]][move.from[1]];
 
+        // Promotion
+        if (movedPiece === "p" && move.to[0] === 7) movedPiece = "q";
+
+        const captured = newBoard[move.to[0]][move.to[1]];
+        newBoard[move.to[0]][move.to[1]] = movedPiece;
+        newBoard[move.from[0]][move.from[1]] = "";
         setBoard(newBoard);
+
         if (captured === "K") {
           setGameOver(true);
           setWinner("Black");
         } else {
           setTurn("white");
+          setCheck(isKingInCheck(newBoard, true));
         }
-      }, 500);
+        setThinking(false);
+      }, 700);
     }
   }, [turn]);
-
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+  
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
   const audio = new Audio(
     "https://res.cloudinary.com/ddfp1evfo/video/upload/v1750240572/knight-hood-240830_x1dqtn.mp3"
   );
@@ -163,99 +221,130 @@ export default function ChessGame() {
             <RefreshCcw
               className="new-game-icon"
               title="New Game"
-              onClick={handleNewGame}
+              onClick={() => setConfirmModalOpen(true)}
             />
           </span>
         </h1>
       </div>
-      <div className="board">
-        {board.map((row, rowIndex) =>
-          row.map((piece, colIndex) => {
-            const selectedClass =
-              selected?.[0] === rowIndex && selected?.[1] === colIndex
-                ? "selected"
+
+      <div className="relative w-full">
+        <div
+          className={`board transition duration-300 ${
+            thinking ? "blur-[1px] brightness-90" : ""
+          }`}
+        >
+          {board.map((row, rowIndex) =>
+            row.map((piece, colIndex) => {
+              const selectedClass =
+                selected?.[0] === rowIndex && selected?.[1] === colIndex
+                  ? "selected"
+                  : "";
+              const possibleMoveClass = possibleMoves.some(
+                ([r, c]) => r === rowIndex && c === colIndex
+              )
+                ? "possible-move"
                 : "";
+              const squareColor =
+                (rowIndex + colIndex) % 2 === 0 ? "light" : "dark";
+              const isChecked =
+                piece === (turn === "white" ? "K" : "k") && check;
+              const checkClass = isChecked ? "check" : "";
+              return (
+                <div
+                  key={`${rowIndex}-${colIndex}`}
+                  className={`square ${squareColor} ${selectedClass} ${possibleMoveClass} ${checkClass}`}
+                  onClick={() => handleClick(rowIndex, colIndex)}
+                >
+                  {piece && <img src={pieceIcons[piece]} alt={piece} />}
+                </div>
+              );
+            })
+          )}
+        </div>
 
-            const possibleMoveClass = possibleMoves.some(
-              ([r, c]) => r === rowIndex && c === colIndex
-            )
-              ? "possible-move"
-              : "";
-
-            const squareColor =
-              (rowIndex + colIndex) % 2 === 0 ? "light" : "dark";
-
-            return (
-              <div
-                key={`${rowIndex}-${colIndex}`}
-                className={`square ${squareColor} ${selectedClass} ${possibleMoveClass}`}
-                onClick={() => handleClick(rowIndex, colIndex)}
-              >
-                {piece && <img src={pieceIcons[piece]} alt={piece} />}
-              </div>
-            );
-          })
+        {thinking && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+            <div className="text-white text-5xl font-extrabold tracking-wider drop-shadow-md animate-pulse">
+              THINKING...
+            </div>
+          </div>
         )}
       </div>
+
       {gameOver && (
         <div className="result-banner">
           🏁 Game Over — <strong>{winner}</strong> wins!
         </div>
       )}
+
+      <Dialog open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
+      <DialogContent className="bg-black/80 text-white backdrop-blur-md rounded-xl">
+  <DialogHeader>
+    <DialogTitle className="text-white text-xl font-semibold">Start New Game?</DialogTitle>
+    <DialogDescription className="text-gray-300 text-sm">
+      This will reset your current game. Are you sure you want to continue?
+    </DialogDescription>
+  </DialogHeader>
+  <DialogFooter>
+    <Button variant="ghost" onClick={() => setConfirmModalOpen(false)}>
+      Cancel
+    </Button>
+    <Button onClick={handleNewGame} className="bg-yellow-400 hover:bg-yellow-500 text-black">Yes</Button>
+  </DialogFooter>
+</DialogContent>
+
+      </Dialog>
     </div>
   );
 }
+
+// Aggressive Bot Evaluation
 function evaluateBoard(board: string[][]): number {
   let score = 0;
+  let mobility = 0;
   for (let i = 0; i < 8; i++) {
     for (let j = 0; j < 8; j++) {
       const piece = board[i][j];
-      if (piece) {
-        const val = pieceScore[piece.toLowerCase()] || 0;
-        score += isWhite(piece) ? val : -val;
-      }
+      if (!piece) continue;
+      const val = pieceScore[piece.toLowerCase()] || 0;
+      score += isWhite(piece) ? val : -val;
+      const pseudo = getPseudoLegalMoves(board, i, j).length;
+      mobility += isWhite(piece) ? pseudo : -pseudo;
     }
   }
-  return score;
+  return score + 0.1 * mobility;
 }
 
 type Move = { from: [number, number]; to: [number, number] };
 
-function minimaxRoot(board: string[][], depth: number, isMaximizing: boolean) {
-  const moves: Move[] = getAllLegalMoves(board, isMaximizing);
+function minimaxRoot(board: string[][], depth: number, isMax: boolean) {
+  const moves = getAllLegalMoves(board, isMax);
   let bestMove: Move | null = null;
-  let bestEval = isMaximizing ? -Infinity : Infinity;
-
+  let bestEval = isMax ? -Infinity : Infinity;
   for (const move of moves) {
     const copy = board.map((r) => [...r]);
     copy[move.to[0]][move.to[1]] = copy[move.from[0]][move.from[1]];
     copy[move.from[0]][move.from[1]] = "";
-    const evalScore = minimax(copy, depth - 1, !isMaximizing);
-    if (isMaximizing ? evalScore > bestEval : evalScore < bestEval) {
+    const evalScore = minimax(copy, depth - 1, !isMax);
+    if ((isMax && evalScore > bestEval) || (!isMax && evalScore < bestEval)) {
       bestEval = evalScore;
       bestMove = move;
     }
   }
-
   return { move: bestMove, value: bestEval };
 }
 
-function minimax(
-  board: string[][],
-  depth: number,
-  isMaximizing: boolean
-): number {
+function minimax(board: string[][], depth: number, isMax: boolean): number {
   if (depth === 0) return evaluateBoard(board);
-  const moves = getAllLegalMoves(board, isMaximizing);
-  if (moves.length === 0) return evaluateBoard(board);
-
-  let best = isMaximizing ? -Infinity : Infinity;
+  const moves = getAllLegalMoves(board, isMax);
+  if (!moves.length) return evaluateBoard(board);
+  let best = isMax ? -Infinity : Infinity;
   for (const move of moves) {
     const copy = board.map((r) => [...r]);
     copy[move.to[0]][move.to[1]] = copy[move.from[0]][move.from[1]];
     copy[move.from[0]][move.from[1]] = "";
-    const evalScore = minimax(copy, depth - 1, !isMaximizing);
-    best = isMaximizing ? Math.max(best, evalScore) : Math.min(best, evalScore);
+    const score = minimax(copy, depth - 1, !isMax);
+    best = isMax ? Math.max(best, score) : Math.min(best, score);
   }
   return best;
 }
@@ -266,10 +355,8 @@ function getAllLegalMoves(board: string[][], isWhiteTurn: boolean): Move[] {
     for (let j = 0; j < 8; j++) {
       const piece = board[i][j];
       if ((isWhiteTurn && isWhite(piece)) || (!isWhiteTurn && isBlack(piece))) {
-        const pseudoMoves = getPseudoLegalMoves(board, i, j);
-        pseudoMoves.forEach(([r, c]) =>
-          moves.push({ from: [i, j], to: [r, c] })
-        );
+        const pseudo = getPseudoLegalMoves(board, i, j);
+        pseudo.forEach(([r, c]) => moves.push({ from: [i, j], to: [r, c] }));
       }
     }
   }
@@ -283,24 +370,22 @@ function getPseudoLegalMoves(
 ): [number, number][] {
   const moves: [number, number][] = [];
   const piece = board[row][col];
+  if (!piece) return moves;
   const lower = piece.toLowerCase();
-  const isWhitePiece = isWhite(piece);
-  const direction = isWhitePiece ? -1 : 1;
+  const isW = isWhite(piece);
+  const dir = isW ? -1 : 1;
 
   if (lower === "p") {
-    const nextRow = row + direction;
-    if (board[nextRow]?.[col] === "") moves.push([nextRow, col]);
-    if ((isWhitePiece && row === 6) || (!isWhitePiece && row === 1)) {
-      const jumpRow = row + 2 * direction;
-      if (board[nextRow]?.[col] === "" && board[jumpRow]?.[col] === "") {
-        moves.push([jumpRow, col]);
-      }
+    const next = row + dir;
+    if (board[next]?.[col] === "") moves.push([next, col]);
+    if ((isW && row === 6) || (!isW && row === 1)) {
+      const jump = row + 2 * dir;
+      if (board[next]?.[col] === "" && board[jump]?.[col] === "")
+        moves.push([jump, col]);
     }
-    for (let dc of [-1, 1]) {
-      const capture = board[nextRow]?.[col + dc];
-      if (capture && isWhitePiece !== isWhite(capture)) {
-        moves.push([nextRow, col + dc]);
-      }
+    for (const dc of [-1, 1]) {
+      const cap = board[next]?.[col + dc];
+      if (cap && isWhite(cap) !== isW) moves.push([next, col + dc]);
     }
   }
 
@@ -311,14 +396,14 @@ function getPseudoLegalMoves(
       [0, 1],
       [0, -1],
     ]) {
-      for (let step = 1; step < 8; step++) {
-        const r = row + dx * step;
-        const c = col + dy * step;
+      for (let s = 1; s < 8; s++) {
+        const r = row + dx * s,
+          c = col + dy * s;
         if (r < 0 || c < 0 || r >= 8 || c >= 8) break;
-        const target = board[r][c];
-        if (!target) moves.push([r, c]);
+        const t = board[r][c];
+        if (!t) moves.push([r, c]);
         else {
-          if (isWhitePiece !== isWhite(target)) moves.push([r, c]);
+          if (isWhite(t) !== isW) moves.push([r, c]);
           break;
         }
       }
@@ -332,14 +417,14 @@ function getPseudoLegalMoves(
       [1, -1],
       [-1, 1],
     ]) {
-      for (let step = 1; step < 8; step++) {
-        const r = row + dx * step;
-        const c = col + dy * step;
+      for (let s = 1; s < 8; s++) {
+        const r = row + dx * s,
+          c = col + dy * s;
         if (r < 0 || c < 0 || r >= 8 || c >= 8) break;
-        const target = board[r][c];
-        if (!target) moves.push([r, c]);
+        const t = board[r][c];
+        if (!t) moves.push([r, c]);
         else {
-          if (isWhitePiece !== isWhite(target)) moves.push([r, c]);
+          if (isWhite(t) !== isW) moves.push([r, c]);
           break;
         }
       }
@@ -357,11 +442,11 @@ function getPseudoLegalMoves(
       [1, -2],
       [-1, -2],
     ]) {
-      const r = row + dx;
-      const c = col + dy;
+      const r = row + dx,
+        c = col + dy;
       if (r < 0 || c < 0 || r >= 8 || c >= 8) continue;
-      const target = board[r][c];
-      if (!target || isWhitePiece !== isWhite(target)) moves.push([r, c]);
+      const t = board[r][c];
+      if (!t || isWhite(t) !== isW) moves.push([r, c]);
     }
   }
 
@@ -376,11 +461,11 @@ function getPseudoLegalMoves(
       [1, -1],
       [-1, 1],
     ]) {
-      const r = row + dx;
-      const c = col + dy;
+      const r = row + dx,
+        c = col + dy;
       if (r < 0 || c < 0 || r >= 8 || c >= 8) continue;
-      const target = board[r][c];
-      if (!target || isWhitePiece !== isWhite(target)) moves.push([r, c]);
+      const t = board[r][c];
+      if (!t || isWhite(t) !== isW) moves.push([r, c]);
     }
   }
 

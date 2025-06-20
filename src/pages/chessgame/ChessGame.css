@@ -88,3 +88,51 @@
   align-items: center;
   gap: 0.6rem;
 }
+/* Add or update this in ChessGame.css */
+
+.relative {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+.square.check-king {
+  background-color: #dc2626 !important; /* Red background */
+}
+.promotion-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #111827;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  display: flex;
+  gap: 1rem;
+  z-index: 50;
+}
+
+.promotion-option {
+  width: 60px;
+  height: 60px;
+  cursor: pointer;
+  border: 2px solid white;
+  border-radius: 0.25rem;
+  transition: transform 0.2s;
+}
+
+.promotion-option:hover {
+  transform: scale(1.1);
+}
+.check {
+  outline: 3px solid red;
+  outline-offset: -2px;
+}
+.dialog-content-light {
+  background-color: #ffffff;
+  color: #000000;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
