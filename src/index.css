@@ -9,3 +9,9 @@ body,
 #root {
   height: 100%;
 }
+
+  body {
+    background-image: url('/favicon2.png'); /* Only works if favicon2.png is in /public */
+    background-repeat: no-repeat;
+    background-position: center;
+  }
