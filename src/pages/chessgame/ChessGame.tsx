@@ -178,7 +178,7 @@ export default function ChessGame() {
           setCheck(isKingInCheck(newBoard, true));
         }
         setThinking(false);
-      }, 700);
+      }, 900);
     }
   }, [turn]);
   useEffect(() => {

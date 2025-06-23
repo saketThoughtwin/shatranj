@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,20 +9,35 @@ import {
   headingStyle,
   iconButtonStyle,
 } from "./StartGame.styles";
+import LoadingScreen from "@/pages/loadingscreen/LoadingScreen"
 
 const StartGame = () => {
   const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [showHindiText, setShowHindiText] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setShowHindiText((prev) => !prev);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleStartGame = async () => {
     try {
       await audioRef.current?.play();
-      setTimeout(() => navigate("/game"), 300);
+      setLoading(true); // show loading screen
     } catch (err) {
       console.warn("Audio play failed:", err);
-      navigate("/game");
+      setLoading(true); // fallback still show loading
     }
   };
+
+  if (loading) {
+    return <LoadingScreen onComplete={() => navigate("/game")} />;
+  }
 
   return (
     <div className={startGameContainer}>
@@ -40,9 +55,18 @@ const StartGame = () => {
           src="https://res.cloudinary.com/ddfp1evfo/video/upload/v1750240572/knight-hood-240830_x1dqtn.mp3"
           loop
         />
-      <div className="flex flex-col items-center justify-center gap-6">
+        <div className="flex flex-col items-center justify-center gap-6">
           <h1 className={headingStyle}>
-            ♛ Welcome to <span className="text-yellow-400">Shatranj</span>
+            ♛{" "}
+            {showHindiText ? (
+              <>
+                <span className="text-yellow-400">शतरंज</span> में आपका स्वागत है
+              </>
+            ) : (
+              <>
+                Welcome to <span className="text-yellow-400">Shatranj</span>
+              </>
+            )}
           </h1>
 
           <Button onClick={handleStartGame} className={iconButtonStyle} size="icon">
