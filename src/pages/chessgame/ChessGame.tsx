@@ -186,14 +186,14 @@ export default function ChessGame() {
       e.preventDefault();
       e.returnValue = "";
     };
-  
+
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
   const audio = new Audio(
-    "https://res.cloudinary.com/ddfp1evfo/video/upload/v1750240572/knight-hood-240830_x1dqtn.mp3"
+    "https://res.cloudinary.com/ddfp1evfo/video/upload/v1750668928/videoplayback_vpzpip.mp3"
   );
 
   useEffect(() => {
@@ -278,21 +278,28 @@ export default function ChessGame() {
       )}
 
       <Dialog open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
-      <DialogContent className="bg-black/80 text-white backdrop-blur-md rounded-xl">
-  <DialogHeader>
-    <DialogTitle className="text-white text-xl font-semibold">Start New Game?</DialogTitle>
-    <DialogDescription className="text-gray-300 text-sm">
-      This will reset your current game. Are you sure you want to continue?
-    </DialogDescription>
-  </DialogHeader>
-  <DialogFooter>
-    <Button variant="ghost" onClick={() => setConfirmModalOpen(false)}>
-      Cancel
-    </Button>
-    <Button onClick={handleNewGame} className="bg-yellow-400 hover:bg-yellow-500 text-black">Yes</Button>
-  </DialogFooter>
-</DialogContent>
-
+        <DialogContent className="bg-black/80 text-white backdrop-blur-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl font-semibold">
+              Start New Game?
+            </DialogTitle>
+            <DialogDescription className="text-gray-300 text-sm">
+              This will reset your current game. Are you sure you want to
+              continue?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleNewGame}
+              className="bg-yellow-400 hover:bg-yellow-500 text-black"
+            >
+              Yes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
     </div>
   );
