@@ -7,6 +7,7 @@ const LoadingScreen = ({ onComplete }: { onComplete: () => void }) => {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
+    console.log("aaaaa");
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
