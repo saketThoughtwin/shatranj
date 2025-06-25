@@ -4,8 +4,9 @@
   flex-direction: column;
   align-items: center;
   padding: 2rem;
-  background: radial-gradient(#1f2937, #111827);
+  background: transparent; 
   min-height: 100vh;
+  z-index: 1; /* ensure content stays above background */
 }
 
 /* Header */
@@ -18,7 +19,7 @@
   font-size: 2.5rem;
   color: white;
   font-weight: bold;
-  margin-bottom: 2rem;
+  margin-bottom: 0.2rem;
 }
 
 .title-group {
@@ -85,14 +86,15 @@
 
 /* Result Banner */
 .result-banner {
-  margin-top: 2rem;
-  padding: 1rem 2rem;
+  margin-top: 1rem;
+  padding: 0.6rem 1.2rem;
   background-color: #16a34a;
   color: white;
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: bold;
   border-radius: 8px;
   text-align: center;
+  display: inline-block;
 }
 
 /* Refresh Icon */
@@ -185,4 +187,32 @@
     width: 45px;
     height: 45px;
   }
+}
+.promotion-option {
+  width: 60px;
+  height: 60px;
+  cursor: pointer;
+  border: 2px solid white;
+  border-radius: 0.25rem;
+  transition: transform 0.2s;
+}
+
+.promotion-option:hover {
+  transform: scale(1.1);
+  border-color: #facc15; /* Tailwind yellow-400 */
+  box-shadow: 0 0 10px #facc15;
+}
+/* Add this at the bottom of ChessGame.css */
+
+.chess-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-image: url("../../assets/chess3.jpg"); /* Adjust path if needed */
+  background-size: cover;
+  background-position: center;
+  filter: blur(10px) brightness(0.5);
+  z-index: -1;
 }

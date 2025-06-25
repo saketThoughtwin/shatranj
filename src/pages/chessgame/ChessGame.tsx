@@ -22,6 +22,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Smile, Activity, Flame } from "lucide-react";
 
 const pieceIcons: Record<string, string> = {
   K: wk,
@@ -93,7 +94,21 @@ export default function ChessGame() {
   const [possibleMoves, setPossibleMoves] = useState<[number, number][]>([]);
   const [thinking, setThinking] = useState(false);
   const [check, setCheck] = useState(false);
+  const [promotion, setPromotion] = useState<{
+    from: [number, number];
+    to: [number, number];
+    color: "white" | "black";
+  } | null>(null);
+  
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const difficulty =
+    (localStorage.getItem("botLevel") as "easy" | "medium" | "hard") ||
+    "medium";
+  const depth = {
+    easy: 1,
+    medium: 3,
+    hard: 4,
+  }[difficulty];
 
   const handleClick = (row: number, col: number) => {
     if (gameOver || turn !== "white" || thinking) return;
@@ -102,13 +117,16 @@ export default function ChessGame() {
     if (selected) {
       const [fromRow, fromCol] = selected;
       const selectedPiece = board[fromRow][fromCol];
-      const legal = getPseudoLegalMoves(board, fromRow, fromCol);
+      const legal = getLegalMovesFiltered(board, fromRow, fromCol, true);
       if (legal.some(([r, c]) => r === row && c === col)) {
         const newBoard = board.map((r) => [...r]);
         let movedPiece = selectedPiece;
 
         // Promotion
-        if (movedPiece === "P" && row === 0) movedPiece = "Q";
+        if (movedPiece === "P" && row === 0) {
+          setPromotion({ from: [fromRow, fromCol], to: [row, col], color: "white" });
+          return;
+        }        
         if (movedPiece === "p" && row === 7) movedPiece = "q";
 
         const captured = newBoard[row][col];
@@ -121,23 +139,50 @@ export default function ChessGame() {
         if (captured === "k") {
           setGameOver(true);
           setWinner("White");
-        } else {
-          setTurn("black");
-          setCheck(isKingInCheck(newBoard, false));
-        }
+        }else {
+          const isBlackInCheck = isKingInCheck(newBoard, false);
+          const blackLegalMoves = getAllLegalMovesSafe(newBoard, false);
+        
+          if (isBlackInCheck && blackLegalMoves.length === 0) {
+            setGameOver(true);
+            setWinner("White"); // ✅ CHECKMATE
+          } else if (!isBlackInCheck && blackLegalMoves.length === 0) {
+            setGameOver(true);
+            setWinner("Draw"); // 🤝 STALEMATE
+          } else {
+            setTurn("black");
+            setCheck(isBlackInCheck);
+          }
+        }        
         return;
       }
       setSelected(null);
       setPossibleMoves([]);
     } else {
       if (isWhite(piece)) {
-        const legal = getPseudoLegalMoves(board, row, col);
+        const legal = getLegalMovesFiltered(board, row, col, true);
         setSelected([row, col]);
         setPossibleMoves(legal);
       }
     }
   };
-
+  //for choose one of them selecting the pawn promotion selecting 
+  const handlePromotionSelect = (type: string) => {
+    if (!promotion) return;
+  
+    const newBoard = board.map((r) => [...r]);
+    const promotedPiece = promotion.color === "white" ? type : type.toLowerCase();
+  
+    newBoard[promotion.to[0]][promotion.to[1]] = promotedPiece;
+    newBoard[promotion.from[0]][promotion.from[1]] = "";
+  
+    setBoard(newBoard);
+    setTurn(promotion.color === "white" ? "black" : "white");
+    setPromotion(null);
+  
+    setCheck(isKingInCheck(newBoard, promotion.color === "black"));
+  };
+  
   const handleNewGame = () => {
     setBoard(initialBoard);
     setTurn("white");
@@ -153,34 +198,54 @@ export default function ChessGame() {
   useEffect(() => {
     if (turn === "black" && !gameOver) {
       setThinking(true);
+  
       setTimeout(() => {
-        const { move } = minimaxRoot(board, 3, false);
+        const { move } = minimaxRoot(board, depth, false);
         if (!move) {
           setThinking(false);
           return;
         }
+  
         const newBoard = board.map((r) => [...r]);
         let movedPiece = newBoard[move.from[0]][move.from[1]];
-
-        // Promotion
+  
+        // Pawn promotion
         if (movedPiece === "p" && move.to[0] === 7) movedPiece = "q";
-
+  
         const captured = newBoard[move.to[0]][move.to[1]];
         newBoard[move.to[0]][move.to[1]] = movedPiece;
         newBoard[move.from[0]][move.from[1]] = "";
+  
         setBoard(newBoard);
-
+  
+        // ✅ If White king was captured, it's game over
         if (captured === "K") {
           setGameOver(true);
           setWinner("Black");
+          setThinking(false);
+          return;
+        }
+  
+        // ✅ Check if White is in checkmate or stalemate
+        const isWhiteInCheck = isKingInCheck(newBoard, true);
+        const whiteLegalMoves = getAllLegalMovesSafe(newBoard, true);
+  
+        if (isWhiteInCheck && whiteLegalMoves.length === 0) {
+          setGameOver(true);
+          setWinner("Black");
+        } else if (!isWhiteInCheck && whiteLegalMoves.length === 0) {
+          setGameOver(true);
+          setWinner("Draw");
         } else {
           setTurn("white");
-          setCheck(isKingInCheck(newBoard, true));
+          setCheck(isWhiteInCheck);
         }
+  
         setThinking(false);
       }, 900);
     }
   }, [turn]);
+  
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
@@ -213,7 +278,9 @@ export default function ChessGame() {
   }, []);
 
   return (
-    <div className="game-wrapper">
+    <>   
+    <div className="chess-background" />
+     <div className="game-wrapper">
       <div className="game-header">
         <h1 className="title">
           <span className="title-group">
@@ -224,6 +291,15 @@ export default function ChessGame() {
               onClick={() => setConfirmModalOpen(true)}
             />
           </span>
+          <p className="text-2xl font-bold text-white mt-1 text-center flex items-center justify-center gap-1">
+            Level:
+            <span className="text-yellow-400 flex items-center gap-1">
+              {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+              {difficulty === "easy" && <Smile className="w-6 h-6" />}
+              {difficulty === "medium" && <Activity className="w-6 h-6" />}
+              {difficulty === "hard" && <Flame className="w-6 h-6" />}
+            </span>
+          </p>
         </h1>
       </div>
 
@@ -273,7 +349,10 @@ export default function ChessGame() {
 
       {gameOver && (
         <div className="result-banner">
-          🏁 Game Over — <strong>{winner}</strong> wins!
+          🏁 Game Over —{" "}
+          <strong>
+            {winner === "Draw" ? "It's a Draw!" : `${winner} wins!`}
+          </strong>
         </div>
       )}
 
@@ -301,7 +380,36 @@ export default function ChessGame() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* choosing modal for pawn promotion  */}
+      <Dialog open={!!promotion} onOpenChange={() => setPromotion(null)}>
+  <DialogContent className="bg-black text-white rounded-xl">
+    <DialogHeader>
+      <DialogTitle className="text-lg font-semibold">
+        Choose promotion piece
+      </DialogTitle>
+    </DialogHeader>
+    <div className="flex justify-around gap-4 mt-4">
+      {["Q", "R", "B", "N"].map((type) => {
+        const pieceCode =
+          promotion?.color === "white" ? type : type.toLowerCase();
+        return (
+          <img
+            key={type}
+            src={pieceIcons[pieceCode]}
+            className="promotion-option"
+            alt={type}
+            onClick={() => handlePromotionSelect(type)}
+          />
+        );
+      })}
     </div>
+  </DialogContent>
+</Dialog>
+
+    </div>
+    </>
+
   );
 }
 
@@ -325,14 +433,23 @@ function evaluateBoard(board: string[][]): number {
 type Move = { from: [number, number]; to: [number, number] };
 
 function minimaxRoot(board: string[][], depth: number, isMax: boolean) {
-  const moves = getAllLegalMoves(board, isMax);
+  const moves = getAllLegalMovesSafe(board, isMax);
+  if (!moves.length) return { move: null, value: isMax ? -Infinity : Infinity }; // ✅ prevents bot freeze
+
   let bestMove: Move | null = null;
   let bestEval = isMax ? -Infinity : Infinity;
+
   for (const move of moves) {
     const copy = board.map((r) => [...r]);
     copy[move.to[0]][move.to[1]] = copy[move.from[0]][move.from[1]];
     copy[move.from[0]][move.from[1]] = "";
-    const evalScore = minimax(copy, depth - 1, !isMax);
+    const evalScore = minimaxAlphaBeta(
+      copy,
+      depth - 1,
+      -Infinity,
+      Infinity,
+      !isMax
+    );
     if ((isMax && evalScore > bestEval) || (!isMax && evalScore < bestEval)) {
       bestEval = evalScore;
       bestMove = move;
@@ -341,19 +458,44 @@ function minimaxRoot(board: string[][], depth: number, isMax: boolean) {
   return { move: bestMove, value: bestEval };
 }
 
-function minimax(board: string[][], depth: number, isMax: boolean): number {
+//best algo for bot turn
+function minimaxAlphaBeta(
+  board: string[][],
+  depth: number,
+  alpha: number,
+  beta: number,
+  isMax: boolean
+): number {
   if (depth === 0) return evaluateBoard(board);
+
   const moves = getAllLegalMoves(board, isMax);
   if (!moves.length) return evaluateBoard(board);
-  let best = isMax ? -Infinity : Infinity;
-  for (const move of moves) {
-    const copy = board.map((r) => [...r]);
-    copy[move.to[0]][move.to[1]] = copy[move.from[0]][move.from[1]];
-    copy[move.from[0]][move.from[1]] = "";
-    const score = minimax(copy, depth - 1, !isMax);
-    best = isMax ? Math.max(best, score) : Math.min(best, score);
+
+  if (isMax) {
+    let maxEval = -Infinity;
+    for (const move of moves) {
+      const copy = board.map((r) => [...r]);
+      copy[move.to[0]][move.to[1]] = copy[move.from[0]][move.from[1]];
+      copy[move.from[0]][move.from[1]] = "";
+      const evalScore = minimaxAlphaBeta(copy, depth - 1, alpha, beta, false);
+      maxEval = Math.max(maxEval, evalScore);
+      alpha = Math.max(alpha, evalScore);
+      if (beta <= alpha) break; // pruning
+    }
+    return maxEval;
+  } else {
+    let minEval = Infinity;
+    for (const move of moves) {
+      const copy = board.map((r) => [...r]);
+      copy[move.to[0]][move.to[1]] = copy[move.from[0]][move.from[1]];
+      copy[move.from[0]][move.from[1]] = "";
+      const evalScore = minimaxAlphaBeta(copy, depth - 1, alpha, beta, true);
+      minEval = Math.min(minEval, evalScore);
+      beta = Math.min(beta, evalScore);
+      if (beta <= alpha) break; // pruning
+    }
+    return minEval;
   }
-  return best;
 }
 
 function getAllLegalMoves(board: string[][], isWhiteTurn: boolean): Move[] {
@@ -362,14 +504,14 @@ function getAllLegalMoves(board: string[][], isWhiteTurn: boolean): Move[] {
     for (let j = 0; j < 8; j++) {
       const piece = board[i][j];
       if ((isWhiteTurn && isWhite(piece)) || (!isWhiteTurn && isBlack(piece))) {
-        const pseudo = getPseudoLegalMoves(board, i, j);
+        const pseudo = getPseudoLegalMoves(board, i, j); // ✅ keep original
         pseudo.forEach(([r, c]) => moves.push({ from: [i, j], to: [r, c] }));
       }
     }
   }
   return moves;
 }
-
+//rules wise turn for every player
 function getPseudoLegalMoves(
   board: string[][],
   row: number,
@@ -477,4 +619,68 @@ function getPseudoLegalMoves(
   }
 
   return moves;
+}
+function getAllLegalMovesSafe(board: string[][], isWhiteTurn: boolean): Move[] {
+  const moves: Move[] = [];
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 8; j++) {
+      const piece = board[i][j];
+      if ((isWhiteTurn && isWhite(piece)) || (!isWhiteTurn && isBlack(piece))) {
+        const pseudo = getPseudoLegalMoves(board, i, j);
+        for (const [r, c] of pseudo) {
+          const temp = board.map((row) => [...row]);
+          temp[r][c] = piece;
+          temp[i][j] = "";
+          if (!isKingInCheck(temp, isWhiteTurn)) {
+            moves.push({ from: [i, j], to: [r, c] });
+          }
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+//for safe king and only king safe turn when king is checkmate
+function getLegalMovesFiltered(
+  board: string[][],
+  row: number,
+  col: number,
+  isWhiteTurn: boolean
+): [number, number][] {
+  const piece = board[row][col];
+  if (!piece) return [];
+
+  const isW = isWhite(piece);
+  if (isW !== isWhiteTurn) return [];
+
+  const pseudoMoves = getPseudoLegalMoves(board, row, col);
+  const legalMoves: [number, number][] = [];
+
+  const inCheck = isKingInCheck(board, isWhiteTurn);
+
+  for (const [r, c] of pseudoMoves) {
+    const tempBoard = board.map((row) => [...row]);
+    tempBoard[r][c] = piece;
+    tempBoard[row][col] = "";
+    const stillInCheck = isKingInCheck(tempBoard, isWhiteTurn);
+
+    if (!inCheck || (inCheck && !stillInCheck)) {
+      legalMoves.push([r, c]);
+    }
+  }
+
+  return legalMoves;
+}
+//for draw logic
+function isStalemate(board: string[][], isWhiteTurn: boolean): boolean {
+  const legalMoves = getAllLegalMovesSafe(board, isWhiteTurn);
+  const inCheck = isKingInCheck(board, isWhiteTurn);
+  return !inCheck && legalMoves.length === 0;
+}
+
+function isCheckmate(board: string[][], isWhiteTurn: boolean): boolean {
+  const inCheck = isKingInCheck(board, isWhiteTurn);
+  const legalMoves = getAllLegalMovesSafe(board, isWhiteTurn);
+  return inCheck && legalMoves.length === 0;
 }
