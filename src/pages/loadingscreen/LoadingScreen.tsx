@@ -5,22 +5,33 @@ import "@/pages/loadingscreen/LoadingScreen.css";
 
 const LoadingScreen = ({ onComplete }: { onComplete: () => void }) => {
   const [progress, setProgress] = useState(0);
+  const [completed, setCompleted] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
-          onComplete();
+          setCompleted(true);
           return 100;
         }
-        return prev + 1; // Slower increment
+        return prev + 1;
       });
-    }, 40); // Slightly slower (original was 40)
-  
+    }, 40);
+
     return () => clearInterval(interval);
-  }, [onComplete]);
-  
+  }, []);
+
+  // 🚨 Trigger `onComplete()` only after hitting 100%
+  useEffect(() => {
+    if (completed) {
+      const timeout = setTimeout(() => {
+        onComplete();
+      }, 200); // slight delay for UX smoothness
+
+      return () => clearTimeout(timeout);
+    }
+  }, [completed, onComplete]);
 
   return (
     <div className="loading-overlay">
@@ -32,7 +43,7 @@ const LoadingScreen = ({ onComplete }: { onComplete: () => void }) => {
           </h1>
           <Progress
             value={progress}
-              className="w-full h-4 bg-gray-700 [&>div]:bg-yellow-400"
+            className="w-full h-4 bg-gray-700 [&>div]:bg-yellow-400"
           />
           <p className="text-sm text-white">{progress}%</p>
         </CardContent>

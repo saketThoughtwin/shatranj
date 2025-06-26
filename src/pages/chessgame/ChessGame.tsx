@@ -21,9 +21,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Smile, Activity, Flame } from "lucide-react";
-
+import rulesData from "@/data/chessRules.json";
 const pieceIcons: Record<string, string> = {
   K: wk,
   Q: wq,
@@ -99,8 +106,12 @@ export default function ChessGame() {
     to: [number, number];
     color: "white" | "black";
   } | null>(null);
-  
+  const [whiteCaptured, setWhiteCaptured] = useState<string[]>([]);
+  const [blackCaptured, setBlackCaptured] = useState<string[]>([]);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(true);
+  const [language, setLanguage] = useState<"en" | "hi">("en");
+  const langContent = rulesData[language];
   const difficulty =
     (localStorage.getItem("botLevel") as "easy" | "medium" | "hard") ||
     "medium";
@@ -124,12 +135,23 @@ export default function ChessGame() {
 
         // Promotion
         if (movedPiece === "P" && row === 0) {
-          setPromotion({ from: [fromRow, fromCol], to: [row, col], color: "white" });
+          setPromotion({
+            from: [fromRow, fromCol],
+            to: [row, col],
+            color: "white",
+          });
           return;
-        }        
+        }
         if (movedPiece === "p" && row === 7) movedPiece = "q";
 
         const captured = newBoard[row][col];
+        if (captured && isWhite(captured)) {
+          setWhiteCaptured((prev) => [...prev, captured]);
+        }
+        if (captured && isBlack(captured)) {
+          setBlackCaptured((prev) => [...prev, captured]);
+        }
+
         newBoard[row][col] = movedPiece;
         newBoard[fromRow][fromCol] = "";
         setBoard(newBoard);
@@ -139,10 +161,10 @@ export default function ChessGame() {
         if (captured === "k") {
           setGameOver(true);
           setWinner("White");
-        }else {
+        } else {
           const isBlackInCheck = isKingInCheck(newBoard, false);
           const blackLegalMoves = getAllLegalMovesSafe(newBoard, false);
-        
+
           if (isBlackInCheck && blackLegalMoves.length === 0) {
             setGameOver(true);
             setWinner("White"); // ✅ CHECKMATE
@@ -150,10 +172,12 @@ export default function ChessGame() {
             setGameOver(true);
             setWinner("Draw"); // 🤝 STALEMATE
           } else {
-            setTurn("black");
-            setCheck(isBlackInCheck);
+            setTimeout(() => {
+              setTurn("black");
+              setCheck(isBlackInCheck);
+            }, 700);
           }
-        }        
+        }
         return;
       }
       setSelected(null);
@@ -166,23 +190,24 @@ export default function ChessGame() {
       }
     }
   };
-  //for choose one of them selecting the pawn promotion selecting 
+  //for choose one of them selecting the pawn promotion selecting
   const handlePromotionSelect = (type: string) => {
     if (!promotion) return;
-  
+
     const newBoard = board.map((r) => [...r]);
-    const promotedPiece = promotion.color === "white" ? type : type.toLowerCase();
-  
+    const promotedPiece =
+      promotion.color === "white" ? type : type.toLowerCase();
+
     newBoard[promotion.to[0]][promotion.to[1]] = promotedPiece;
     newBoard[promotion.from[0]][promotion.from[1]] = "";
-  
+
     setBoard(newBoard);
     setTurn(promotion.color === "white" ? "black" : "white");
     setPromotion(null);
-  
+
     setCheck(isKingInCheck(newBoard, promotion.color === "black"));
   };
-  
+
   const handleNewGame = () => {
     setBoard(initialBoard);
     setTurn("white");
@@ -198,26 +223,29 @@ export default function ChessGame() {
   useEffect(() => {
     if (turn === "black" && !gameOver) {
       setThinking(true);
-  
+
       setTimeout(() => {
         const { move } = minimaxRoot(board, depth, false);
         if (!move) {
           setThinking(false);
           return;
         }
-  
+
         const newBoard = board.map((r) => [...r]);
         let movedPiece = newBoard[move.from[0]][move.from[1]];
-  
+
         // Pawn promotion
         if (movedPiece === "p" && move.to[0] === 7) movedPiece = "q";
-  
+
         const captured = newBoard[move.to[0]][move.to[1]];
+        if (captured && isWhite(captured)) {
+          setWhiteCaptured((prev) => [...prev, captured]);
+        }
         newBoard[move.to[0]][move.to[1]] = movedPiece;
         newBoard[move.from[0]][move.from[1]] = "";
-  
+
         setBoard(newBoard);
-  
+
         // ✅ If White king was captured, it's game over
         if (captured === "K") {
           setGameOver(true);
@@ -225,11 +253,11 @@ export default function ChessGame() {
           setThinking(false);
           return;
         }
-  
+
         // ✅ Check if White is in checkmate or stalemate
         const isWhiteInCheck = isKingInCheck(newBoard, true);
         const whiteLegalMoves = getAllLegalMovesSafe(newBoard, true);
-  
+
         if (isWhiteInCheck && whiteLegalMoves.length === 0) {
           setGameOver(true);
           setWinner("Black");
@@ -240,12 +268,12 @@ export default function ChessGame() {
           setTurn("white");
           setCheck(isWhiteInCheck);
         }
-  
+
         setThinking(false);
       }, 900);
     }
   }, [turn]);
-  
+
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
@@ -278,138 +306,241 @@ export default function ChessGame() {
   }, []);
 
   return (
-    <>   
-    <div className="chess-background" />
-     <div className="game-wrapper">
-      <div className="game-header">
-        <h1 className="title">
-          <span className="title-group">
-            ♟️ Shatranj
-            <RefreshCcw
-              className="new-game-icon"
-              title="New Game"
-              onClick={() => setConfirmModalOpen(true)}
-            />
-          </span>
-          <p className="text-2xl font-bold text-white mt-1 text-center flex items-center justify-center gap-1">
-            Level:
-            <span className="text-yellow-400 flex items-center gap-1">
-              {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-              {difficulty === "easy" && <Smile className="w-6 h-6" />}
-              {difficulty === "medium" && <Activity className="w-6 h-6" />}
-              {difficulty === "hard" && <Flame className="w-6 h-6" />}
+    <>
+      <div className="chess-background" />
+      <div className="game-wrapper">
+        <div className="game-header">
+          <h1 className="title">
+            <span className="title-group">
+              ♟️ Shatranj
+              <RefreshCcw
+                className="new-game-icon"
+                title="New Game"
+                onClick={() => setConfirmModalOpen(true)}
+              />
             </span>
-          </p>
-        </h1>
-      </div>
+            <p className="text-2xl font-bold text-white mt-1 text-center flex items-center justify-center gap-1">
+              Level:
+              <span className="text-yellow-400 flex items-center gap-1">
+                {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                {difficulty === "easy" && <Smile className="w-6 h-6" />}
+                {difficulty === "medium" && <Activity className="w-6 h-6" />}
+                {difficulty === "hard" && <Flame className="w-6 h-6" />}
+              </span>
+            </p>
+          </h1>
+        </div>
 
-      <div className="relative w-full">
-        <div
-          className={`board transition duration-300 ${
-            thinking ? "blur-[1px] brightness-90" : ""
-          }`}
-        >
-          {board.map((row, rowIndex) =>
-            row.map((piece, colIndex) => {
-              const selectedClass =
-                selected?.[0] === rowIndex && selected?.[1] === colIndex
-                  ? "selected"
-                  : "";
-              const possibleMoveClass = possibleMoves.some(
-                ([r, c]) => r === rowIndex && c === colIndex
-              )
-                ? "possible-move"
-                : "";
-              const squareColor =
-                (rowIndex + colIndex) % 2 === 0 ? "light" : "dark";
-              const isChecked =
-                piece === (turn === "white" ? "K" : "k") && check;
-              const checkClass = isChecked ? "check" : "";
-              return (
-                <div
-                  key={`${rowIndex}-${colIndex}`}
-                  className={`square ${squareColor} ${selectedClass} ${possibleMoveClass} ${checkClass}`}
-                  onClick={() => handleClick(rowIndex, colIndex)}
-                >
-                  {piece && <img src={pieceIcons[piece]} alt={piece} />}
-                </div>
-              );
-            })
+        <div className="relative w-full">
+          <div className="board-container">
+            {/* White's captured pieces (left side) */}
+            <div className="captured-column">
+              {whiteCaptured.map((p, i) => (
+                <img
+                  key={i}
+                  src={pieceIcons[p]}
+                  alt={p}
+                  className="captured-icon"
+                />
+              ))}
+            </div>
+
+            {/* Main board */}
+            <div
+              className={`board transition duration-300 ${
+                thinking ? "blur-[1px] brightness-90" : ""
+              }`}
+            >
+              {board.map((row, rowIndex) =>
+                row.map((piece, colIndex) => {
+                  const selectedClass =
+                    selected?.[0] === rowIndex && selected?.[1] === colIndex
+                      ? "selected"
+                      : "";
+                  const possibleMoveClass = possibleMoves.some(
+                    ([r, c]) => r === rowIndex && c === colIndex
+                  )
+                    ? "possible-move"
+                    : "";
+                  const squareColor =
+                    (rowIndex + colIndex) % 2 === 0 ? "light" : "dark";
+                  const isChecked =
+                    piece === (turn === "white" ? "K" : "k") && check;
+                  const checkClass = isChecked ? "check" : "";
+
+                  return (
+                    <div
+                      key={`${rowIndex}-${colIndex}`}
+                      className={`square ${squareColor} ${selectedClass} ${possibleMoveClass} ${checkClass}`}
+                      onClick={() => handleClick(rowIndex, colIndex)}
+                    >
+                      {piece && <img src={pieceIcons[piece]} alt={piece} />}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Black's captured pieces (right side) */}
+            <div className="captured-column">
+              {blackCaptured.map((p, i) => (
+                <img
+                  key={i}
+                  src={pieceIcons[p]}
+                  alt={p}
+                  className="captured-icon"
+                />
+              ))}
+            </div>
+          </div>
+
+          {thinking && (
+            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+              <div className="text-white text-5xl font-extrabold tracking-wider drop-shadow-md animate-pulse">
+                THINKING...
+              </div>
+            </div>
           )}
         </div>
 
-        {thinking && (
-          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-            <div className="text-white text-5xl font-extrabold tracking-wider drop-shadow-md animate-pulse">
-              THINKING...
-            </div>
+        {gameOver && (
+          <div className="result-banner">
+            🏁 Game Over —{" "}
+            <strong>
+              {winner === "Draw" ? "It's a Draw!" : `${winner} wins!`}
+            </strong>
           </div>
         )}
+
+        <Dialog open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
+          <DialogContent className="bg-black/80 text-white backdrop-blur-md rounded-xl">
+            <DialogHeader>
+              <DialogTitle className="text-white text-xl font-semibold">
+                Start New Game?
+              </DialogTitle>
+              <DialogDescription className="text-gray-300 text-sm">
+                This will reset your current game. Are you sure you want to
+                continue?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => setConfirmModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleNewGame}
+                className="bg-yellow-400 hover:bg-yellow-500 text-black"
+              >
+                Yes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* choosing modal for pawn promotion  */}
+        <Dialog open={!!promotion} onOpenChange={() => setPromotion(null)}>
+          <DialogContent className="bg-black text-white rounded-xl">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold">
+                Choose promotion piece
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex justify-around gap-4 mt-4">
+              {["Q", "R", "B", "N"].map((type) => {
+                const pieceCode =
+                  promotion?.color === "white" ? type : type.toLowerCase();
+                return (
+                  <img
+                    key={type}
+                    src={pieceIcons[pieceCode]}
+                    className="promotion-option"
+                    alt={type}
+                    onClick={() => handlePromotionSelect(type)}
+                  />
+                );
+              })}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* rules and condition of chess game */}
+        <Dialog open={showRulesModal} onOpenChange={setShowRulesModal}>
+          <DialogContent className="bg-black/90 text-white rounded-xl max-w-lg">
+            <DialogHeader>
+              <div className="flex justify-between items-center w-full">
+                {/* Title */}
+                <DialogTitle className="text-2xl font-bold text-yellow-400">
+                  {langContent.title}
+                </DialogTitle>
+
+                {/* Language Dropdown */}
+                <Select
+                  value={language}
+                  onValueChange={(value) => setLanguage(value as "en" | "hi")}
+                >
+                  <SelectTrigger className="w-[130px] bg-black border border-yellow-400 text-yellow-400 hover:border-yellow-500 text-sm mr-4">
+                    <SelectValue placeholder="Language" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-black border border-yellow-400 text-white">
+                    <SelectItem
+                      value="en"
+                      className="hover:bg-yellow-500 hover:text-black text-sm"
+                    >
+                      English
+                    </SelectItem>
+                    <SelectItem
+                      value="hi"
+                      className="hover:bg-yellow-500 hover:text-black text-sm"
+                    >
+                      हिन्दी
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </DialogHeader>
+
+            {/* Description */}
+            <p className="text-sm text-gray-300 mt-1">
+              {langContent.description}
+            </p>
+
+            {/* Rules List */}
+            <div className="space-y-2 text-sm mt-4">
+              {langContent.rules.map((rule, idx) => (
+                <p key={idx}>{rule}</p>
+              ))}
+            </div>
+
+            {/* Piece Movement Section */}
+            <div className="mt-6 space-y-2">
+              <h3 className="text-lg font-semibold text-yellow-400">
+                {langContent.howPiecesMove}
+              </h3>
+              <ul className="text-sm text-white mt-2 space-y-2">
+                {langContent.pieceMoves.map((move, idx) => (
+                  <li key={idx}>
+                    <strong>{move.piece}:</strong> {move.description}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Continue Button */}
+            <DialogFooter className="mt-6 flex justify-end">
+              <Button
+                className="bg-yellow-400 text-black hover:bg-yellow-500"
+                onClick={() => setShowRulesModal(false)}
+              >
+                {langContent.button}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-
-      {gameOver && (
-        <div className="result-banner">
-          🏁 Game Over —{" "}
-          <strong>
-            {winner === "Draw" ? "It's a Draw!" : `${winner} wins!`}
-          </strong>
-        </div>
-      )}
-
-      <Dialog open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
-        <DialogContent className="bg-black/80 text-white backdrop-blur-md rounded-xl">
-          <DialogHeader>
-            <DialogTitle className="text-white text-xl font-semibold">
-              Start New Game?
-            </DialogTitle>
-            <DialogDescription className="text-gray-300 text-sm">
-              This will reset your current game. Are you sure you want to
-              continue?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleNewGame}
-              className="bg-yellow-400 hover:bg-yellow-500 text-black"
-            >
-              Yes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* choosing modal for pawn promotion  */}
-      <Dialog open={!!promotion} onOpenChange={() => setPromotion(null)}>
-  <DialogContent className="bg-black text-white rounded-xl">
-    <DialogHeader>
-      <DialogTitle className="text-lg font-semibold">
-        Choose promotion piece
-      </DialogTitle>
-    </DialogHeader>
-    <div className="flex justify-around gap-4 mt-4">
-      {["Q", "R", "B", "N"].map((type) => {
-        const pieceCode =
-          promotion?.color === "white" ? type : type.toLowerCase();
-        return (
-          <img
-            key={type}
-            src={pieceIcons[pieceCode]}
-            className="promotion-option"
-            alt={type}
-            onClick={() => handlePromotionSelect(type)}
-          />
-        );
-      })}
-    </div>
-  </DialogContent>
-</Dialog>
-
-    </div>
     </>
-
   );
 }
 
@@ -671,16 +802,4 @@ function getLegalMovesFiltered(
   }
 
   return legalMoves;
-}
-//for draw logic
-function isStalemate(board: string[][], isWhiteTurn: boolean): boolean {
-  const legalMoves = getAllLegalMovesSafe(board, isWhiteTurn);
-  const inCheck = isKingInCheck(board, isWhiteTurn);
-  return !inCheck && legalMoves.length === 0;
-}
-
-function isCheckmate(board: string[][], isWhiteTurn: boolean): boolean {
-  const inCheck = isKingInCheck(board, isWhiteTurn);
-  const legalMoves = getAllLegalMovesSafe(board, isWhiteTurn);
-  return inCheck && legalMoves.length === 0;
 }
