@@ -1,0 +1,47 @@
+{
+    "en": {
+      "title": "Chess Game Rules",
+      "description": "Learn the basics before you start playing.",
+      "rules": [
+        "• White moves first.",
+        "• Each type of piece moves in a unique way.",
+        "• The goal is to checkmate your opponent’s king.",
+        "• Pawns can promote to any piece upon reaching the end.",
+        "• You cannot make a move that puts your own king in check.",
+        "• A game can end in checkmate, draw, or stalemate."
+      ],
+      "howPiecesMove": "How Each Piece Moves",
+      "pieceMoves": [
+        { "piece": "Pawn", "icon": "pawn.svg", "description": "Moves forward 1 square, captures diagonally." },
+        { "piece": "Rook", "icon": "rook.svg", "description": "Moves horizontally or vertically any number of squares." },
+        { "piece": "Knight", "icon": "knight.svg", "description": "Moves in an L-shape." },
+        { "piece": "Bishop", "icon": "bishop.svg", "description": "Moves diagonally any number of squares." },
+        { "piece": "Queen", "icon": "queen.svg", "description": "Moves any number of squares in any direction." },
+        { "piece": "King", "icon": "king.svg", "description": "Moves one square in any direction." }
+      ],
+      "button": "Continue"
+    },
+    "hi": {
+      "title": "शतरंज के नियम",
+      "description": "खेल शुरू करने से पहले नियम जानें।",
+      "rules": [
+        "• सफेद मोहरे पहले चलते हैं।",
+        "• प्रत्येक मोहरा अलग तरह से चलता है।",
+        "• लक्ष्य है विरोधी के राजा को मात देना।",
+        "• प्यादा अंतिम पंक्ति पर पहुँचने पर किसी भी मोहरे में बदल सकता है।",
+        "• ऐसा कोई भी चाल नहीं चल सकते जिससे आपका राजा खतरे में आए।",
+        "• खेल चेकमेट, ड्रॉ या स्टेलमेट पर समाप्त हो सकता है।"
+      ],
+      "howPiecesMove": "मोहरों की चाल",
+      "pieceMoves": [
+        { "piece": "प्यादा", "icon": "pawn.svg", "description": "1 घर आगे चलता है, पर तिरछा मारता है।" },
+        { "piece": "हाथी", "icon": "rook.svg", "description": "सीधे रेखा में किसी भी दिशा में चलता है।" },
+        { "piece": "घोड़ा", "icon": "knight.svg", "description": "L आकार में चलता है।" },
+        { "piece": "ऊंट", "icon": "bishop.svg", "description": "तिरछा किसी भी दूरी तक चलता है।" },
+        { "piece": "वज़ीर", "icon": "queen.svg", "description": "किसी भी दिशा में चलता है।" },
+        { "piece": "राजा", "icon": "king.svg", "description": "किसी भी दिशा में एक घर चलता है।" }
+      ],
+      "button": "जारी रखें"
+    }
+  }
+  
