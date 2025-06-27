@@ -315,10 +315,13 @@ export default function ChessGame() {
               ♟️ Shatranj
               <RefreshCcw
                 className="new-game-icon"
-                title="New Game"
                 onClick={() => setConfirmModalOpen(true)}
-              />
+                aria-label="New Game"
+              >
+                <title>New Game</title>
+              </RefreshCcw>
             </span>
+
             <p className="text-2xl font-bold text-white mt-1 text-center flex items-center justify-center gap-1">
               Level:
               <span className="text-yellow-400 flex items-center gap-1">
