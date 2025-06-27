@@ -16,13 +16,3 @@
     z-index: -1;
   }
   
-  .loading-card {
-    width: 90%;
-    max-width: 500px;
-    background-color: rgba(17, 24, 39, 0.85); /* Dark transparent */
-    backdrop-filter: blur(10px);
-    border-radius: 1rem;
-    box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
-    color: white;
-  }
-  
