@@ -63,7 +63,7 @@ const StartGame = () => {
           src="https://res.cloudinary.com/ddfp1evfo/video/upload/v1750240572/knight-hood-240830_x1dqtn.mp3"
           loop
         />
-        <div className="flex flex-col items-center justify-center gap-5 md:gap-7">
+        <div className="flex flex-col items-center justify-center gap-4 sm:gap-5 md:gap-7 px-4 text-center">
           {/* Heading */}
           <h1 className={`${headingStyle} transition duration-500 ease-in-out`}>
             ♛{" "}
@@ -79,7 +79,7 @@ const StartGame = () => {
           </h1>
 
           {/* Difficulty Selector */}
-          <div className="w-[10rem] text-white z-50 font-bold">
+          <div className="w-[10rem] sm:w-[12rem] md:w-[14rem] text-white z-50 font-bold">
             <Select
               defaultValue={level}
               onValueChange={(value) =>
@@ -124,7 +124,7 @@ const StartGame = () => {
             size="icon"
             aria-label="Start Game"
           >
-            <Play className="w-6 h-6" />
+           <Play className="w-5 h-5 sm:w-6 sm:h-6" />
           </Button>
         </div>
       </div>

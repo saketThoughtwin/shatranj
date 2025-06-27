@@ -36,14 +36,14 @@ const LoadingScreen = ({ onComplete }: { onComplete: () => void }) => {
   return (
     <div className="loading-overlay">
       <div className="blurred-backdrop" />
-      <Card className="loading-card">
-        <CardContent className="flex flex-col items-center gap-6 p-10 w-full">
-          <h1 className="text-2xl md:text-3xl font-extrabold text-yellow-400 text-center">
+      <Card className="w-[90%] max-w-md bg-gray-900/85 backdrop-blur-xl rounded-2xl shadow-xl text-white">
+        <CardContent className="flex flex-col items-center gap-6 px-6 py-10 sm:px-10 w-full">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-yellow-400 text-center">
             ♛ Loading Shatranj...
           </h1>
           <Progress
             value={progress}
-            className="w-full h-4 bg-gray-700 [&>div]:bg-yellow-400"
+            className="w-full h-3 sm:h-4 bg-gray-800/90 [&>div]:bg-yellow-400"
           />
           <p className="text-sm text-white">{progress}%</p>
         </CardContent>
