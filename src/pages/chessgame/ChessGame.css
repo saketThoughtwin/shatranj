@@ -309,3 +309,15 @@
     padding: 0 0.5rem;
   }
 }
+.undo-btn {
+  margin-top: 1rem;
+  background: #1f2937;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+.undo-btn:hover {
+  background: #374151;
+}

@@ -49,17 +49,22 @@ export function evaluateBoard(board: string[][]): number {
     return score + 0.1 * mobility;
   };
 
- export  function minimaxRoot(board: string[][], depth: number, isMax: boolean) {
+  export function minimaxRoot(
+    board: string[][],
+    depth: number,
+    isMax: boolean
+  ): { move: Move | null; value: number } {
     const moves = getAllLegalMovesSafe(board, isMax);
-    if (!moves.length) return { move: null, value: isMax ? -Infinity : Infinity }; // ✅ prevents bot freeze
+    if (!moves.length)
+      return { move: null, value: isMax ? -Infinity : Infinity };
   
-    let bestMove: Move | null = null;
-    let bestEval = isMax ? -Infinity : Infinity;
+    const moveScores: { move: Move; score: number }[] = [];
   
     for (const move of moves) {
       const copy = board.map((r) => [...r]);
       copy[move.to[0]][move.to[1]] = copy[move.from[0]][move.from[1]];
       copy[move.from[0]][move.from[1]] = "";
+  
       const evalScore = minimaxAlphaBeta(
         copy,
         depth - 1,
@@ -67,13 +72,22 @@ export function evaluateBoard(board: string[][]): number {
         Infinity,
         !isMax
       );
-      if ((isMax && evalScore > bestEval) || (!isMax && evalScore < bestEval)) {
-        bestEval = evalScore;
-        bestMove = move;
-      }
+      moveScores.push({ move, score: evalScore });
     }
-    return { move: bestMove, value: bestEval };
+  
+    // Sort best to worst (descending for max, ascending for min)
+    moveScores.sort((a, b) =>
+      isMax ? b.score - a.score : a.score - b.score
+    );
+  
+    // Get top N moves to randomize from
+    const topN = Math.min(3, moveScores.length); // Change 3 to 5 for more randomness
+    const topChoices = moveScores.slice(0, topN);
+    const chosen = topChoices[Math.floor(Math.random() * topChoices.length)];
+  
+    return { move: chosen.move, value: chosen.score };
   }
+  
 
 
 //best algo for bot turn
@@ -235,8 +249,37 @@ export function getPseudoLegalMoves(
         const t = board[r][c];
         if (!t || isWhite(t) !== isW) moves.push([r, c]);
       }
+    
+      // ⬇️ Castling logic added here
+      const homeRow = isW ? 7 : 0;
+      const kingStartCol = 4;
+    
+      const kingNotMoved = board[homeRow][kingStartCol] === (isW ? "K" : "k");
+      if (row === homeRow && col === kingStartCol && kingNotMoved) {
+        // Kingside castling
+        const rookColK = 7;
+        if (
+          board[homeRow][rookColK] === (isW ? "R" : "r") &&
+          board[homeRow][5] === "" &&
+          board[homeRow][6] === ""
+        ) {
+          // We assume castling is only allowed if king is not in check and doesn't cross check — this will be checked later in getAllLegalMovesSafe
+          moves.push([homeRow, 6]);
+        }
+    
+        // Queenside castling
+        const rookColQ = 0;
+        if (
+          board[homeRow][rookColQ] === (isW ? "R" : "r") &&
+          board[homeRow][1] === "" &&
+          board[homeRow][2] === "" &&
+          board[homeRow][3] === ""
+        ) {
+          moves.push([homeRow, 2]);
+        }
+      }
     }
-  
+    
     return moves;
   };
 

@@ -26,26 +26,27 @@ export default function RulesModal({
   open,
   onClose,
   language,
+  setLanguage,
 }: RulesModalProps) {
   const langContent = rulesData[language];
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="bg-black/90 text-white rounded-xl w-[90vw] max-w-md sm:max-w-lg md:max-w-xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-black/90 text-white rounded-xl w-[90vw] max-w-md sm:max-w-lg md:max-w-xl p-4 sm:p-6">
         <DialogHeader>
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <DialogTitle className="text-xl sm:text-2xl font-bold text-yellow-400">
               {langContent.title}
             </DialogTitle>
-            <Select>
+
+            <Select
+              value={language}
+              onValueChange={(v) => setLanguage(v as "en" | "hi")}
+            >
               <SelectTrigger className="mr-3 w-full sm:w-[130px] bg-black border border-yellow-400 text-yellow-400 hover:border-yellow-500 text-sm">
                 <SelectValue placeholder="Language" />
               </SelectTrigger>
-              <SelectContent
-                side="bottom"
-                align="end"
-                className="z-40 bg-black border border-yellow-400 text-white"
-              >
+              <SelectContent className="bg-black border border-yellow-400 text-white">
                 <SelectItem
                   value="en"
                   className="hover:bg-yellow-500 hover:text-black text-sm"
