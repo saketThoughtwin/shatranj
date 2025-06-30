@@ -12,10 +12,8 @@ import {
 import RulesModal from "../modals/rules/RulesModal";
 import PawnPromotionModal from "../modals/pawnpromotion/PawnPromotionModal";
 import ConfirmNewGameModal from "../modals/confirmbox/ConfirmNewGameModal";
-import { RefreshCcw } from "lucide-react";
+import { RefreshCcw, Undo2 } from "lucide-react";
 import { Smile, Activity, Flame } from "lucide-react";
-
-
 
 const initialBoard = [
   ["r", "n", "b", "q", "k", "b", "n", "r"],
@@ -47,6 +45,8 @@ export default function ChessGame() {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(true);
   const [language, setLanguage] = useState<"en" | "hi">("en");
+  const [history, setHistory] = useState<string[][][]>([]);
+
   const difficulty =
     (localStorage.getItem("botLevel") as "easy" | "medium" | "hard") ||
     "medium";
@@ -66,6 +66,8 @@ export default function ChessGame() {
       const legal = getLegalMovesFiltered(board, fromRow, fromCol, true);
       if (legal.some(([r, c]) => r === row && c === col)) {
         const newBoard = board.map((r) => [...r]);
+
+        setHistory((prev) => [...prev, board.map((row) => [...row])]);
         let movedPiece = selectedPiece;
 
         // Promotion
@@ -89,6 +91,19 @@ export default function ChessGame() {
 
         newBoard[row][col] = movedPiece;
         newBoard[fromRow][fromCol] = "";
+        // ♜ Handle castling move: move the rook too
+        if (selectedPiece === "K" && fromCol === 4) {
+          // White kingside castling
+          if (row === 7 && col === 6 && board[7][7] === "R") {
+            newBoard[7][5] = "R";
+            newBoard[7][7] = "";
+          }
+          // White queenside castling
+          if (row === 7 && col === 2 && board[7][0] === "R") {
+            newBoard[7][3] = "R";
+            newBoard[7][0] = "";
+          }
+        }
         setBoard(newBoard);
         setSelected(null);
         setPossibleMoves([]);
@@ -125,6 +140,21 @@ export default function ChessGame() {
       }
     }
   };
+
+  //for undo moves
+  const handleUndo = () => {
+    if (history.length === 0 || thinking) return;
+
+    const lastBoard = history[history.length - 1];
+    setBoard(lastBoard);
+    setHistory((prev) => prev.slice(0, -1));
+    setSelected(null);
+    setPossibleMoves([]);
+    setGameOver(false);
+    setWinner(null);
+    setTurn((prev) => (prev === "white" ? "black" : "white"));
+  };
+
   //for choose one of them selecting the pawn promotion selecting
   const handlePromotionSelect = (type: string) => {
     if (!promotion) return;
@@ -367,6 +397,13 @@ export default function ChessGame() {
           onCancel={() => setConfirmModalOpen(false)}
           onConfirm={handleNewGame}
         />
+        <button
+          onClick={handleUndo}
+          className="undo-btn"
+          title="Undo Last Move"
+        >
+          <Undo2 className="w-6 h-6 text-white hover:text-yellow-400" />
+        </button>
 
         {/* choosing modal for pawn promotion  */}
         <PawnPromotionModal
