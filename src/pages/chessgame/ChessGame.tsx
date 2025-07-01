@@ -45,7 +45,13 @@ export default function ChessGame() {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(true);
   const [language, setLanguage] = useState<"en" | "hi">("en");
-  const [history, setHistory] = useState<string[][][]>([]);
+  type HistoryItem = {
+    board: string[][],
+    whiteCaptured: string[],
+    blackCaptured: string[],
+  };
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [justUndone, setJustUndone] = useState(false);
 
   const difficulty =
     (localStorage.getItem("botLevel") as "easy" | "medium" | "hard") ||
@@ -67,7 +73,15 @@ export default function ChessGame() {
       if (legal.some(([r, c]) => r === row && c === col)) {
         const newBoard = board.map((r) => [...r]);
 
-        setHistory((prev) => [...prev, board.map((row) => [...row])]);
+        setHistory((prev) => [
+          ...prev,
+          {
+            board: board.map((row) => [...row]),
+            whiteCaptured: [...whiteCaptured],
+            blackCaptured: [...blackCaptured],
+          },
+        ]);
+        
         let movedPiece = selectedPiece;
 
         // Promotion
@@ -143,17 +157,24 @@ export default function ChessGame() {
 
   //for undo moves
   const handleUndo = () => {
-    if (history.length === 0 || thinking) return;
-
-    const lastBoard = history[history.length - 1];
-    setBoard(lastBoard);
-    setHistory((prev) => prev.slice(0, -1));
+    if (history.length < 2 || thinking) return;
+  
+    const stateBeforeMyMove = history[history.length - 2];
+  
+    setBoard(stateBeforeMyMove.board);
+    setWhiteCaptured(stateBeforeMyMove.whiteCaptured);
+    setBlackCaptured(stateBeforeMyMove.blackCaptured);
+  
+    setHistory((prev) => prev.slice(0, -2));
     setSelected(null);
     setPossibleMoves([]);
     setGameOver(false);
     setWinner(null);
-    setTurn((prev) => (prev === "white" ? "black" : "white"));
+    setTurn("white");
   };
+  
+  
+  
 
   //for choose one of them selecting the pawn promotion selecting
   const handlePromotionSelect = (type: string) => {
@@ -185,71 +206,71 @@ export default function ChessGame() {
     setConfirmModalOpen(false);
     setWhiteCaptured([]); // ✅ Clear white captured pieces
     setBlackCaptured([]);
+    setHistory([]);
   };
 
   useEffect(() => {
+    if (justUndone) {
+      setJustUndone(false); // skip this bot turn cycle
+      return;
+    }
+  
     if (turn === "black" && !gameOver) {
       setThinking(true);
-
+  
       setTimeout(() => {
         const { move } = minimaxRoot(board, depth, false);
         if (!move) {
           setThinking(false);
           return;
         }
-
+  
         const newBoard = board.map((r) => [...r]);
         let movedPiece = newBoard[move.from[0]][move.from[1]];
-
-        // ✅ Black pawn promotion
+  
         if (movedPiece === "p" && move.to[0] === 7) {
           movedPiece = "q";
         }
-
+  
         const captured = newBoard[move.to[0]][move.to[1]];
         if (captured && isWhite(captured)) {
           setWhiteCaptured((prev) => [...prev, captured]);
         }
-
-        // ✅ Apply move on the board
+  
         newBoard[move.to[0]][move.to[1]] = movedPiece;
         newBoard[move.from[0]][move.from[1]] = "";
-
+        setHistory((prev) => [
+          ...prev,
+          {
+            board: board.map((r) => [...r]),
+            whiteCaptured: [...whiteCaptured],
+            blackCaptured: [...blackCaptured],
+          },
+        ]);
         setBoard(newBoard);
-
-        // ✅ If white king is captured directly (safety fallback)
-        if (captured === "K") {
-          setGameOver(true);
-          setWinner("Black");
-          setThinking(false);
-          return;
-        }
-
-        // ✅ Checkmate / Stalemate logic for white
+  
         const isWhiteInCheck = isKingInCheck(newBoard, true);
         const whiteLegalMoves = getAllLegalMovesSafe(newBoard, true);
-
+  
         if (whiteLegalMoves.length === 0) {
           if (isWhiteInCheck) {
-            // ✅ White is checkmated
             setGameOver(true);
             setWinner("Black");
           } else {
-            // 🟨 Stalemate
             setGameOver(true);
             setWinner("Draw");
           }
           setThinking(false);
           return;
         }
-
-        // ✅ If game continues, switch to white turn
+  
         setTurn("white");
         setCheck(isWhiteInCheck);
         setThinking(false);
-      }, 900); // Simulate thinking time
+      }, 900);
     }
   }, [turn]);
+  
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {

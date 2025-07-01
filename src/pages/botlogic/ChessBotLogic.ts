@@ -75,18 +75,29 @@ export function evaluateBoard(board: string[][]): number {
       moveScores.push({ move, score: evalScore });
     }
   
-    // Sort best to worst (descending for max, ascending for min)
+    // 🧠 Easy Mode: random move only
+    if (depth === 1) {
+      const randomMove = moves[Math.floor(Math.random() * moves.length)];
+      return { move: randomMove, value: 0 };
+    }
+  
+    // 🟡 Medium Mode: choose randomly from top 3
+    if (depth === 3) {
+      moveScores.sort((a, b) =>
+        isMax ? b.score - a.score : a.score - b.score
+      );
+      const topChoices = moveScores.slice(0, 3);
+      const chosen = topChoices[Math.floor(Math.random() * topChoices.length)];
+      return { move: chosen.move, value: chosen.score };
+    }
+  
+    // 🔥 Hard Mode: always choose best move
     moveScores.sort((a, b) =>
       isMax ? b.score - a.score : a.score - b.score
     );
-  
-    // Get top N moves to randomize from
-    const topN = Math.min(3, moveScores.length); // Change 3 to 5 for more randomness
-    const topChoices = moveScores.slice(0, topN);
-    const chosen = topChoices[Math.floor(Math.random() * topChoices.length)];
-  
-    return { move: chosen.move, value: chosen.score };
+    return { move: moveScores[0].move, value: moveScores[0].score };
   }
+  
   
 
 
@@ -267,7 +278,7 @@ export function getPseudoLegalMoves(
           moves.push([homeRow, 6]);
         }
     
-        // Queenside castling
+        // Queen side castling
         const rookColQ = 0;
         if (
           board[homeRow][rookColQ] === (isW ? "R" : "r") &&
