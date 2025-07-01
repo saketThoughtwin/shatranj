@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import pieceIcons from "@/constants/pieceIcons";
 import "./ChessGame.css";
 import {
@@ -12,7 +12,7 @@ import {
 import RulesModal from "../modals/rules/RulesModal";
 import PawnPromotionModal from "../modals/pawnpromotion/PawnPromotionModal";
 import ConfirmNewGameModal from "../modals/confirmbox/ConfirmNewGameModal";
-import { RefreshCcw, Undo2 } from "lucide-react";
+import { RefreshCcw, Undo2, Volume2, VolumeX } from "lucide-react";
 import { Smile, Activity, Flame } from "lucide-react";
 
 const initialBoard = [
@@ -46,12 +46,17 @@ export default function ChessGame() {
   const [showRulesModal, setShowRulesModal] = useState(true);
   const [language, setLanguage] = useState<"en" | "hi">("en");
   type HistoryItem = {
-    board: string[][],
-    whiteCaptured: string[],
-    blackCaptured: string[],
+    board: string[][];
+    whiteCaptured: string[];
+    blackCaptured: string[];
   };
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [justUndone, setJustUndone] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const moveSoundRef = useRef<HTMLAudioElement | null>(null);
+  const captureSoundRef = useRef<HTMLAudioElement | null>(null);
+  const checkSoundRef = useRef<HTMLAudioElement | null>(null);
 
   const difficulty =
     (localStorage.getItem("botLevel") as "easy" | "medium" | "hard") ||
@@ -81,7 +86,7 @@ export default function ChessGame() {
             blackCaptured: [...blackCaptured],
           },
         ]);
-        
+
         let movedPiece = selectedPiece;
 
         // Promotion
@@ -105,6 +110,15 @@ export default function ChessGame() {
 
         newBoard[row][col] = movedPiece;
         newBoard[fromRow][fromCol] = "";
+        const isBlackInCheck = isKingInCheck(newBoard, false);
+        if (isBlackInCheck) {
+          playCheckSoundWithFade(); // ✅ Play check sound if king is in check
+        } else if (captured) {
+          playCaptureSoundWithFade(); // 🔊 Play capture sound
+        } else {
+          playMoveSoundWithFade(); // 🔊 Play normal move sound
+        }
+
         // ♜ Handle castling move: move the rook too
         if (selectedPiece === "K" && fromCol === 4) {
           // White kingside castling
@@ -158,13 +172,13 @@ export default function ChessGame() {
   //for undo moves
   const handleUndo = () => {
     if (history.length < 2 || thinking) return;
-  
+
     const stateBeforeMyMove = history[history.length - 2];
-  
+
     setBoard(stateBeforeMyMove.board);
     setWhiteCaptured(stateBeforeMyMove.whiteCaptured);
     setBlackCaptured(stateBeforeMyMove.blackCaptured);
-  
+
     setHistory((prev) => prev.slice(0, -2));
     setSelected(null);
     setPossibleMoves([]);
@@ -172,9 +186,43 @@ export default function ChessGame() {
     setWinner(null);
     setTurn("white");
   };
-  
-  
-  
+  const playMoveSoundWithFade = () => {
+    if (!moveSoundRef.current || !audioRef.current) return;
+
+    audioRef.current.volume = isMuted ? 0 : 0.2;
+
+    moveSoundRef.current.currentTime = 0;
+    moveSoundRef.current.volume = isMuted ? 0 : 1;
+    moveSoundRef.current.play();
+
+    setTimeout(() => {
+      if (audioRef.current && !isMuted) {
+        audioRef.current.volume = 1;
+      }
+    }, 700);
+  };
+  //capture sound
+  const playCaptureSoundWithFade = () => {
+    if (!captureSoundRef.current || !audioRef.current) return;
+
+    audioRef.current.volume = isMuted ? 0 : 0.2;
+
+    captureSoundRef.current.currentTime = 0;
+    captureSoundRef.current.volume = isMuted ? 0 : 1;
+    captureSoundRef.current.play();
+
+    setTimeout(() => {
+      if (audioRef.current && !isMuted) {
+        audioRef.current.volume = 1;
+      }
+    }, 700);
+  };
+  const playCheckSoundWithFade = () => {
+    if (!checkSoundRef.current) return;
+    checkSoundRef.current.currentTime = 0;
+    checkSoundRef.current.volume = isMuted ? 0 : 1;
+    checkSoundRef.current.play();
+  };
 
   //for choose one of them selecting the pawn promotion selecting
   const handlePromotionSelect = (type: string) => {
@@ -214,29 +262,29 @@ export default function ChessGame() {
       setJustUndone(false); // skip this bot turn cycle
       return;
     }
-  
+
     if (turn === "black" && !gameOver) {
       setThinking(true);
-  
+
       setTimeout(() => {
         const { move } = minimaxRoot(board, depth, false);
         if (!move) {
           setThinking(false);
           return;
         }
-  
+
         const newBoard = board.map((r) => [...r]);
         let movedPiece = newBoard[move.from[0]][move.from[1]];
-  
+
         if (movedPiece === "p" && move.to[0] === 7) {
           movedPiece = "q";
         }
-  
+
         const captured = newBoard[move.to[0]][move.to[1]];
         if (captured && isWhite(captured)) {
           setWhiteCaptured((prev) => [...prev, captured]);
         }
-  
+
         newBoard[move.to[0]][move.to[1]] = movedPiece;
         newBoard[move.from[0]][move.from[1]] = "";
         setHistory((prev) => [
@@ -248,10 +296,19 @@ export default function ChessGame() {
           },
         ]);
         setBoard(newBoard);
-  
+
         const isWhiteInCheck = isKingInCheck(newBoard, true);
         const whiteLegalMoves = getAllLegalMovesSafe(newBoard, true);
-  
+
+        // 🔊 Add sound based on condition
+        if (isWhiteInCheck) {
+          playCheckSoundWithFade();
+        } else if (captured) {
+          playCaptureSoundWithFade();
+        } else {
+          playMoveSoundWithFade();
+        }
+
         if (whiteLegalMoves.length === 0) {
           if (isWhiteInCheck) {
             setGameOver(true);
@@ -263,45 +320,71 @@ export default function ChessGame() {
           setThinking(false);
           return;
         }
-  
+
         setTurn("white");
         setCheck(isWhiteInCheck);
         setThinking(false);
       }, 900);
     }
   }, [turn]);
-  
 
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
+    audioRef.current = new Audio(
+      "https://res.cloudinary.com/ddfp1evfo/video/upload/v1750668928/videoplayback_vpzpip.mp3"
+    );
+    moveSoundRef.current = new Audio(
+      "https://res.cloudinary.com/ddfp1evfo/video/upload/v1751366493/piece_sound_aq8daj.wav"
+    );
+    captureSoundRef.current = new Audio(
+      "https://res.cloudinary.com/ddfp1evfo/video/upload/v1751369882/capture_sound_lmlwl9.mp3"
+    );
+    checkSoundRef.current = new Audio(
+      "https://res.cloudinary.com/ddfp1evfo/video/upload/v1751371006/checkmate_ntbyei.mp3"
+    );
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, []);
-  const audio = new Audio(
-    "https://res.cloudinary.com/ddfp1evfo/video/upload/v1750668928/videoplayback_vpzpip.mp3"
-  );
+    audioRef.current.loop = true;
 
-  useEffect(() => {
-    audio.loop = true;
+    // Set initial volume based on mute status
+    const volume = isMuted ? 0 : 1;
+    audioRef.current.volume = volume;
+    moveSoundRef.current.volume = volume;
+    captureSoundRef.current.volume = volume;
+    checkSoundRef.current.volume = volume;
+
+    // Auto-play background music
     const playMusic = async () => {
       try {
-        await audio.play();
+        await audioRef.current?.play();
       } catch (err) {
         console.warn("User interaction needed to start music:", err);
       }
     };
+
     playMusic();
+
+    // Cleanup on unmount
     return () => {
-      audio.pause();
-      audio.currentTime = 0;
+      audioRef.current?.pause();
+      audioRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const volume = isMuted ? 0 : 1;
+
+    if (audioRef.current) {
+      if (isMuted) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      audioRef.current.volume = volume;
+    }
+
+    if (moveSoundRef.current) moveSoundRef.current.volume = volume;
+    if (captureSoundRef.current) captureSoundRef.current.volume = volume;
+    if (checkSoundRef.current) checkSoundRef.current.volume = volume;
+  }, [isMuted]);
 
   return (
     <>
@@ -319,6 +402,17 @@ export default function ChessGame() {
                 <title>New Game</title>
               </RefreshCcw>
             </span>
+            <button
+              onClick={() => setIsMuted((prev) => !prev)}
+              className="mute-btn"
+              title={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted ? (
+                <VolumeX className="w-6 h-6 text-white hover:text-yellow-400" />
+              ) : (
+                <Volume2 className="w-6 h-6 text-white hover:text-yellow-400" />
+              )}
+            </button>
 
             <p className="text-2xl font-bold text-white mt-1 text-center flex items-center justify-center gap-1">
               Level:
