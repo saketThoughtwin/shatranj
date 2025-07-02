@@ -265,3 +265,6 @@
   cursor: pointer;
   margin-left: 0.5rem;
 }
+.board.flipped {
+  transform: rotate(180deg);
+}
