@@ -54,6 +54,7 @@ export default function ChessGame() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [justUndone, setJustUndone] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [rulesClosed, setRulesClosed] = useState(false);
   const {
     playMoveSoundWithFade,
     playCaptureSoundWithFade,
@@ -268,13 +269,17 @@ export default function ChessGame() {
     setBlackCaptured([]);
     setHistory([]);
   };
-  useEffect(() => {
+  const handleRulesClose = () => {
+    setShowRulesModal(false);
+    setRulesClosed(true); // ✅ allow bot to start now
+
     if (playerSide === "black") {
-      setTurn("white"); // Let bot start
+      setTurn("white"); // bot starts only now
     }
-  }, []);
+  };
 
   useEffect(() => {
+    if (!rulesClosed) return;
     if (justUndone) {
       setJustUndone(false); // skip this bot turn cycle
       return;
@@ -359,7 +364,7 @@ export default function ChessGame() {
         setThinking(false);
       }, 900);
     }
-  }, [turn]);
+  }, [turn,rulesClosed]);
 
   return (
     <>
@@ -525,7 +530,7 @@ export default function ChessGame() {
         {/* rules and condition of chess game */}
         <RulesModal
           open={showRulesModal}
-          onClose={() => setShowRulesModal(false)}
+          onClose={handleRulesClose}
           language={language}
           setLanguage={setLanguage}
         />
