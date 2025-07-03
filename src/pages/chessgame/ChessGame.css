@@ -265,3 +265,12 @@
   cursor: pointer;
   margin-left: 0.5rem;
 }
+.board.rotate-180 {
+  transform: rotate(180deg);
+}
+.square img {
+  transform: rotate(0deg); /* ensures pieces stay upright */
+}
+.board.rotate-180 .square img {
+  transform: rotate(180deg);
+}

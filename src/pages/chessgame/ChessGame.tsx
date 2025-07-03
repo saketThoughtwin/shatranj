@@ -15,43 +15,44 @@ import PawnPromotionModal from "../modals/pawnpromotion/PawnPromotionModal";
 import ConfirmNewGameModal from "../modals/confirmbox/ConfirmNewGameModal";
 import { RefreshCcw, Undo2, Volume2, VolumeX } from "lucide-react";
 import { Smile, Activity, Flame } from "lucide-react";
-import { useSelector, useDispatch } from "react-redux";
-import type { RootState } from "@/redux/store";
-import {
-  setBoard,
-  setSelected,
-  setTurn,
-  setGameOver,
-  setWinner,
-  setPossibleMoves,
-  setThinking,
-  setCheck,
-  setPromotion,
-  setWhiteCaptured,
-  setBlackCaptured,
-  setHistory,
-  setJustUndone,
-  initialBoard
-} from "@/redux/gameSlice";
+
+const initialBoard = [
+  ["r", "n", "b", "q", "k", "b", "n", "r"],
+  ["p", "p", "p", "p", "p", "p", "p", "p"],
+  ["", "", "", "", "", "", "", ""],
+  ["", "", "", "", "", "", "", ""],
+  ["", "", "", "", "", "", "", ""],
+  ["", "", "", "", "", "", "", ""],
+  ["P", "P", "P", "P", "P", "P", "P", "P"],
+  ["R", "N", "B", "Q", "K", "B", "N", "R"],
+];
 
 export default function ChessGame() {
-  const board = useSelector((state: RootState) => state.game.board);
-  const dispatch = useDispatch();
-  const selected = useSelector((state: RootState) => state.game.selected);
-  const turn = useSelector((state: RootState) => state.game.turn);
-  const gameOver = useSelector((state: RootState) => state.game.gameOver);
-  const winner = useSelector((state: RootState) => state.game.winner);
-  const possibleMoves = useSelector((state: RootState) => state.game.possibleMoves);
-  const thinking = useSelector((state: RootState) => state.game.thinking);
-  const check = useSelector((state: RootState) => state.game.check);
-  const promotion = useSelector((state: RootState) => state.game.promotion);
-  const whiteCaptured = useSelector((state: RootState) => state.game.whiteCaptured);
-  const blackCaptured = useSelector((state: RootState) => state.game.blackCaptured);
+  const [board, setBoard] = useState(initialBoard);
+  const [selected, setSelected] = useState<[number, number] | null>(null);
+  const [turn, setTurn] = useState<"white" | "black">("white");
+  const [gameOver, setGameOver] = useState(false);
+  const [winner, setWinner] = useState<string | null>(null);
+  const [possibleMoves, setPossibleMoves] = useState<[number, number][]>([]);
+  const [thinking, setThinking] = useState(false);
+  const [check, setCheck] = useState(false);
+  const [promotion, setPromotion] = useState<{
+    from: [number, number];
+    to: [number, number];
+    color: "white" | "black";
+  } | null>(null);
+  const [whiteCaptured, setWhiteCaptured] = useState<string[]>([]);
+  const [blackCaptured, setBlackCaptured] = useState<string[]>([]);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(true);
   const [language, setLanguage] = useState<"en" | "hi">("en");
-  const history = useSelector((state: RootState) => state.game.history);
-  const justUndone = useSelector((state: RootState) => state.game.justUndone);
+  type HistoryItem = {
+    board: string[][];
+    whiteCaptured: string[];
+    blackCaptured: string[];
+  };
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [justUndone, setJustUndone] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const {
     playMoveSoundWithFade,
@@ -62,6 +63,9 @@ export default function ChessGame() {
   const difficulty =
     (localStorage.getItem("botLevel") as "easy" | "medium" | "hard") ||
     "medium";
+  const playerSide =
+    (localStorage.getItem("playerColor") as "white" | "black") || "white";
+
   const depth = {
     easy: 1,
     medium: 3,
@@ -69,106 +73,147 @@ export default function ChessGame() {
   }[difficulty];
 
   const handleClick = (row: number, col: number) => {
-    if (gameOver || turn !== "white" || thinking) return;
+    if (gameOver || turn !== playerSide || thinking) return;
     const piece = board[row][col];
 
     if (selected) {
       const [fromRow, fromCol] = selected;
       const selectedPiece = board[fromRow][fromCol];
-      const legal = getLegalMovesFiltered(board, fromRow, fromCol, true);
+
+      // ✅ FIXED: Use actual turn info (white or black)
+      const legal = getLegalMovesFiltered(
+        board,
+        fromRow,
+        fromCol,
+        turn === "white"
+      );
+
       if (legal.some(([r, c]) => r === row && c === col)) {
         const newBoard = board.map((r) => [...r]);
 
-        dispatch(
-          setHistory([
-            ...history,
-            {
-              board: board.map((row) => [...row]),
-              whiteCaptured: [...whiteCaptured],
-              blackCaptured: [...blackCaptured],
-            },
-          ])
-        );
-        
+        // 🔁 Save history
+        setHistory((prev) => [
+          ...prev,
+          {
+            board: board.map((r) => [...r]),
+            whiteCaptured: [...whiteCaptured],
+            blackCaptured: [...blackCaptured],
+          },
+        ]);
 
-        let movedPiece = selectedPiece;
+        const movedPiece = selectedPiece;
 
-        // Promotion
+        // ♟️ Promotion
         if (movedPiece === "P" && row === 0) {
-          dispatch(setPromotion({
+          setPromotion({
             from: [fromRow, fromCol],
             to: [row, col],
             color: "white",
-          }));
+          });
           return;
         }
-        if (movedPiece === "p" && row === 7) movedPiece = "q";
-
-        const captured = newBoard[row][col];
-        if (captured && isWhite(captured)) {
-          dispatch(setWhiteCaptured([...whiteCaptured, captured]));
+        if (movedPiece === "p" && row === 7) {
+          setPromotion({
+            from: [fromRow, fromCol],
+            to: [row, col],
+            color: "black",
+          });
+          return;
         }
-        if (captured && isBlack(captured)) {
-          dispatch(setBlackCaptured([...blackCaptured, captured]));
+
+        // 🎯 Capture
+        const captured = newBoard[row][col];
+        if (captured) {
+          if (isWhite(captured)) {
+            setWhiteCaptured((prev) => [...prev, captured]);
+          } else if (isBlack(captured)) {
+            setBlackCaptured((prev) => [...prev, captured]);
+          }
         }
 
         newBoard[row][col] = movedPiece;
         newBoard[fromRow][fromCol] = "";
-        const isBlackInCheck = isKingInCheck(newBoard, false);
-        if (isBlackInCheck) {
-          playCheckSoundWithFade(); // ✅ Play check sound if king is in check
-        } else if (captured) {
-          playCaptureSoundWithFade(); // 🔊 Play capture sound
-        } else {
-          playMoveSoundWithFade(); // 🔊 Play normal move sound
-        }
 
-        // ♜ Handle castling move: move the rook too
-        if (selectedPiece === "K" && fromCol === 4) {
-          // White kingside castling
+        // ♜ Castling
+        if ((selectedPiece === "K" || selectedPiece === "k") && fromCol === 4) {
+          // White kingside
           if (row === 7 && col === 6 && board[7][7] === "R") {
             newBoard[7][5] = "R";
             newBoard[7][7] = "";
           }
-          // White queen side castling
+          // White queenside
           if (row === 7 && col === 2 && board[7][0] === "R") {
             newBoard[7][3] = "R";
             newBoard[7][0] = "";
           }
-        }
-        dispatch(setBoard(newBoard));
-        dispatch(setSelected(null));
-        dispatch(setPossibleMoves([]));
 
-        if (captured === "k") {
-         dispatch(setGameOver(true));
-          dispatch(setWinner("White"));
-        } else {
-          const isBlackInCheck = isKingInCheck(newBoard, false);
-          const blackLegalMoves = getAllLegalMovesSafe(newBoard, false);
-
-          if (isBlackInCheck && blackLegalMoves.length === 0) {
-            dispatch(setGameOver(true));
-            dispatch(setWinner("White")); // ✅ CHECKMATE
-          } else if (!isBlackInCheck && blackLegalMoves.length === 0) {
-            dispatch(setGameOver(true));
-            dispatch(setWinner("Draw")); // 🤝 STALEMATE
-          } else {
-            setTimeout(() => {
-              dispatch(setTurn("black"));
-              dispatch(setCheck(isBlackInCheck));
-            }, 700);
+          // Black kingside
+          if (row === 0 && col === 6 && board[0][7] === "r") {
+            newBoard[0][5] = "r";
+            newBoard[0][7] = "";
           }
+          // Black queenside
+          if (row === 0 && col === 2 && board[0][0] === "r") {
+            newBoard[0][3] = "r";
+            newBoard[0][0] = "";
+          }
+        }
+
+        // 🔊 Sound Effects
+        const opponentIsWhite = turn === "black";
+        const opponentInCheck = isKingInCheck(newBoard, opponentIsWhite);
+
+        if (opponentInCheck) {
+          playCheckSoundWithFade();
+        } else if (captured) {
+          playCaptureSoundWithFade();
+        } else {
+          playMoveSoundWithFade();
+        }
+
+        // ♟️ Finalize move
+        setBoard(newBoard);
+        setSelected(null);
+        setPossibleMoves([]);
+
+        // 🏁 Game Over Check
+        const opponentLegalMoves = getAllLegalMovesSafe(
+          newBoard,
+          opponentIsWhite
+        );
+        const opponentKing = opponentIsWhite ? "K" : "k";
+
+        if (captured === opponentKing) {
+          setGameOver(true);
+          setWinner(turn === "white" ? "White" : "Black");
+        } else if (opponentInCheck && opponentLegalMoves.length === 0) {
+          setGameOver(true);
+          setWinner(turn === "white" ? "White" : "Black");
+        } else if (!opponentInCheck && opponentLegalMoves.length === 0) {
+          setGameOver(true);
+          setWinner("Draw");
+        } else {
+          setTimeout(() => {
+            setTurn(opponentIsWhite ? "white" : "black");
+            setCheck(opponentInCheck);
+          }, 700);
         }
         return;
       }
-      dispatch(setSelected(null));
-      dispatch(setPossibleMoves([]));
+
+      // ❌ Invalid move click
+      setSelected(null);
+      setPossibleMoves([]);
     } else {
-      if (isWhite(piece)) {
-        const legal = getLegalMovesFiltered(board, row, col, true);
-        dispatch(setSelected([row, col]));
-        dispatch(setPossibleMoves(legal));
+      // ✅ First Click: Select only own piece
+      if (
+        (turn === "white" && isWhite(piece)) ||
+        (turn === "black" && isBlack(piece))
+      ) {
+        // ✅ FIXED: Use actual turn
+        const legal = getLegalMovesFiltered(board, row, col, turn === "white");
+        setSelected([row, col]);
+        setPossibleMoves(legal);
       }
     }
   };
@@ -179,16 +224,16 @@ export default function ChessGame() {
 
     const stateBeforeMyMove = history[history.length - 2];
 
-    dispatch(setBoard(stateBeforeMyMove.board));
-    dispatch(setWhiteCaptured(stateBeforeMyMove.whiteCaptured));
-    dispatch(setBlackCaptured(stateBeforeMyMove.blackCaptured));
+    setBoard(stateBeforeMyMove.board);
+    setWhiteCaptured(stateBeforeMyMove.whiteCaptured);
+    setBlackCaptured(stateBeforeMyMove.blackCaptured);
 
-    dispatch(setHistory(history.slice(0, -2)));
-    dispatch(setSelected(null));
-    dispatch(setPossibleMoves([]));
-    dispatch(setGameOver(false));
-    dispatch(setWinner(null));
-    dispatch(setTurn("white"));
+    setHistory((prev) => prev.slice(0, -2));
+    setSelected(null);
+    setPossibleMoves([]);
+    setGameOver(false);
+    setWinner(null);
+    setTurn("white");
   };
 
   //for choose one of them selecting the pawn promotion selecting
@@ -202,76 +247,92 @@ export default function ChessGame() {
     newBoard[promotion.to[0]][promotion.to[1]] = promotedPiece;
     newBoard[promotion.from[0]][promotion.from[1]] = "";
 
-    dispatch(setBoard(newBoard));
-    dispatch(setTurn(promotion.color === "white" ? "black" : "white"));
-    dispatch(setPromotion(null));
+    setBoard(newBoard);
+    setTurn(promotion.color === "white" ? "black" : "white");
+    setPromotion(null);
 
-    dispatch(setCheck(isKingInCheck(newBoard, promotion.color === "black")));
+    setCheck(isKingInCheck(newBoard, promotion.color === "black"));
   };
 
   const handleNewGame = () => {
-    dispatch(setBoard(initialBoard));
-    dispatch(setTurn("white"));
-    dispatch(setSelected(null));
-    dispatch(setGameOver(false));
-    dispatch(setWinner(null));
-    dispatch(setPossibleMoves([]));
-    dispatch(setThinking(false));
-    dispatch(setCheck(false));
+    setBoard(initialBoard);
+    setTurn("white");
+    setSelected(null);
+    setGameOver(false);
+    setWinner(null);
+    setPossibleMoves([]);
+    setThinking(false);
+    setCheck(false);
     setConfirmModalOpen(false);
-    dispatch(setWhiteCaptured([])); // ✅ Clear white captured pieces
-    dispatch(setBlackCaptured([]));
-    dispatch(setHistory([]));
+    setWhiteCaptured([]); // ✅ Clear white captured pieces
+    setBlackCaptured([]);
+    setHistory([]);
   };
+  useEffect(() => {
+    if (playerSide === "black") {
+      setTurn("white"); // Let bot start
+    }
+  }, []);
 
   useEffect(() => {
     if (justUndone) {
-      dispatch(setJustUndone(false)); // skip this bot turn cycle
+      setJustUndone(false); // skip this bot turn cycle
       return;
     }
 
-    if (turn === "black" && !gameOver) {
-      dispatch(setThinking(true));
+    // Bot's turn
+    if (turn !== playerSide && !gameOver) {
+      setThinking(true);
 
       setTimeout(() => {
-        const { move } = minimaxRoot(board, depth, false);
+        const isBotWhite = playerSide === "black";
+        const { move } = minimaxRoot(board, depth, isBotWhite);
         if (!move) {
-          dispatch(setThinking(false));
+          setThinking(false);
           return;
         }
 
         const newBoard = board.map((r) => [...r]);
         let movedPiece = newBoard[move.from[0]][move.from[1]];
 
-        if (movedPiece === "p" && move.to[0] === 7) {
-          movedPiece = "q";
+        // Handle promotion
+        if (
+          (isBotWhite && movedPiece === "P" && move.to[0] === 0) ||
+          (!isBotWhite && movedPiece === "p" && move.to[0] === 7)
+        ) {
+          movedPiece = isBotWhite ? "Q" : "q";
         }
 
         const captured = newBoard[move.to[0]][move.to[1]];
-        if (captured && isWhite(captured)) {
-          dispatch(setWhiteCaptured([...whiteCaptured, captured]));
+        if (captured) {
+          if (isBotWhite && isBlack(captured)) {
+            setBlackCaptured((prev) => [...prev, captured]);
+          } else if (!isBotWhite && isWhite(captured)) {
+            setWhiteCaptured((prev) => [...prev, captured]);
+          }
         }
 
         newBoard[move.to[0]][move.to[1]] = movedPiece;
         newBoard[move.from[0]][move.from[1]] = "";
-        dispatch(
-          setHistory([
-            ...history,
-            {
-              board: board.map((row) => [...row]),
-              whiteCaptured: [...whiteCaptured],
-              blackCaptured: [...blackCaptured],
-            },
-          ])
-        );
-        
-        dispatch(setBoard(newBoard));
 
-        const isWhiteInCheck = isKingInCheck(newBoard, true);
-        const whiteLegalMoves = getAllLegalMovesSafe(newBoard, true);
+        // Save history
+        setHistory((prev) => [
+          ...prev,
+          {
+            board: board.map((r) => [...r]),
+            whiteCaptured: [...whiteCaptured],
+            blackCaptured: [...blackCaptured],
+          },
+        ]);
 
-        // 🔊 Add sound based on condition
-        if (isWhiteInCheck) {
+        setBoard(newBoard);
+
+        const isPlayerWhite = playerSide === "white";
+        const playerInCheck = isKingInCheck(newBoard, isPlayerWhite);
+        const playerLegalMoves = getAllLegalMovesSafe(newBoard, isPlayerWhite);
+
+        // Sound effects
+        if (playerInCheck) {
           playCheckSoundWithFade();
         } else if (captured) {
           playCaptureSoundWithFade();
@@ -279,21 +340,23 @@ export default function ChessGame() {
           playMoveSoundWithFade();
         }
 
-        if (whiteLegalMoves.length === 0) {
-          if (isWhiteInCheck) {
-            dispatch(setGameOver(true));
-            dispatch(setWinner("Black"));
+        // Game Over?
+        if (playerLegalMoves.length === 0) {
+          if (playerInCheck) {
+            setGameOver(true);
+            setWinner(isBotWhite ? "White" : "Black");
           } else {
-            dispatch(setGameOver(true));
-           dispatch(setWinner("Draw"));
+            setGameOver(true);
+            setWinner("Draw");
           }
-          dispatch(setThinking(false));
+          setThinking(false);
           return;
         }
 
-        dispatch(setTurn("white"));
-        dispatch(setCheck(isWhiteInCheck));
-        dispatch(setThinking(false));
+        // Player's turn
+        setTurn(playerSide);
+        setCheck(playerInCheck);
+        setThinking(false);
       }, 900);
     }
   }, [turn]);
@@ -354,37 +417,57 @@ export default function ChessGame() {
 
             {/* Main board */}
             <div
-              className={`board transition duration-300 ${
-                thinking ? "blur-[1px] brightness-90" : ""
-              }`}
+              className={`board ${playerSide === "black" ? "rotate-180" : ""}`}
             >
-              {board.map((row, rowIndex) =>
-                row.map((piece, colIndex) => {
-                  const selectedClass =
-                    selected?.[0] === rowIndex && selected?.[1] === colIndex
-                      ? "selected"
-                      : "";
-                  const possibleMoveClass = possibleMoves.some(
-                    ([r, c]) => r === rowIndex && c === colIndex
-                  )
-                    ? "possible-move"
-                    : "";
-                  const squareColor =
-                    (rowIndex + colIndex) % 2 === 0 ? "light" : "dark";
-                  const isChecked =
-                    piece === (turn === "white" ? "K" : "k") && check;
-                  const checkClass = isChecked ? "check" : "";
+              {(playerSide === "black" ? [...board].reverse() : board).map(
+                (row, rowIndexOriginal) => {
+                  const rowIndex =
+                    playerSide === "black"
+                      ? 7 - rowIndexOriginal
+                      : rowIndexOriginal;
 
                   return (
-                    <div
-                      key={`${rowIndex}-${colIndex}`}
-                      className={`square ${squareColor} ${selectedClass} ${possibleMoveClass} ${checkClass}`}
-                      onClick={() => handleClick(rowIndex, colIndex)}
-                    >
-                      {piece && <img src={pieceIcons[piece]} alt={piece} />}
-                    </div>
-                  );
-                })
+                    playerSide === "black" ? [...row].reverse() : row
+                  ).map((piece, colIndexOriginal) => {
+                    const colIndex =
+                      playerSide === "black"
+                        ? 7 - colIndexOriginal
+                        : colIndexOriginal;
+
+                    const selectedClass =
+                      selected?.[0] === rowIndex && selected?.[1] === colIndex
+                        ? "selected"
+                        : "";
+
+                    const possibleMoveClass = possibleMoves.some(
+                      ([r, c]) => r === rowIndex && c === colIndex
+                    )
+                      ? "possible-move"
+                      : "";
+
+                    const squareColor =
+                      (rowIndex + colIndex) % 2 === 0 ? "light" : "dark";
+                    const isChecked =
+                      piece === (turn === "white" ? "K" : "k") && check;
+                    const checkClass = isChecked ? "check" : "";
+
+                    return (
+                      <div
+                        key={`${rowIndex}-${colIndex}`}
+                        className={`square ${squareColor} ${selectedClass} ${possibleMoveClass} ${checkClass}`}
+                        onClick={() => handleClick(rowIndex, colIndex)}
+                      >
+                        {piece && (
+                          <img
+                            src={pieceIcons[piece]}
+                            alt={piece}
+                            draggable={false}
+                          />
+                        )}
+                      </div>
+                    );
+                  });
+                }
               )}
             </div>
 
@@ -400,7 +483,6 @@ export default function ChessGame() {
               ))}
             </div>
           </div>
-
           {thinking && (
             <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
               <div className="text-white text-5xl font-extrabold tracking-wider drop-shadow-md animate-pulse">
@@ -436,7 +518,7 @@ export default function ChessGame() {
         <PawnPromotionModal
           promotion={promotion}
           onSelect={handlePromotionSelect}
-          onClose={() => dispatch(setPromotion(null))}
+          onClose={() => setPromotion(null)}
           pieceIcons={pieceIcons}
         />
 
