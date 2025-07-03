@@ -63,14 +63,14 @@ export default function ChessGame() {
   const difficulty =
     (localStorage.getItem("botLevel") as "easy" | "medium" | "hard") ||
     "medium";
-    const playerSide = (localStorage.getItem("playerColor") as "white" | "black") || "white";
+  const playerSide =
+    (localStorage.getItem("playerColor") as "white" | "black") || "white";
 
   const depth = {
     easy: 1,
     medium: 3,
     hard: 4,
   }[difficulty];
- 
 
   const handleClick = (row: number, col: number) => {
     if (gameOver || turn !== playerSide || thinking) return;
@@ -79,22 +79,31 @@ export default function ChessGame() {
     if (selected) {
       const [fromRow, fromCol] = selected;
       const selectedPiece = board[fromRow][fromCol];
-      const legal = getLegalMovesFiltered(board, fromRow, fromCol, true);
+
+      // ✅ FIXED: Use actual turn info (white or black)
+      const legal = getLegalMovesFiltered(
+        board,
+        fromRow,
+        fromCol,
+        turn === "white"
+      );
+
       if (legal.some(([r, c]) => r === row && c === col)) {
         const newBoard = board.map((r) => [...r]);
 
+        // 🔁 Save history
         setHistory((prev) => [
           ...prev,
           {
-            board: board.map((row) => [...row]),
+            board: board.map((r) => [...r]),
             whiteCaptured: [...whiteCaptured],
             blackCaptured: [...blackCaptured],
           },
         ]);
 
-        let movedPiece = selectedPiece;
+        const movedPiece = selectedPiece;
 
-        // Promotion
+        // ♟️ Promotion
         if (movedPiece === "P" && row === 0) {
           setPromotion({
             from: [fromRow, fromCol],
@@ -103,71 +112,106 @@ export default function ChessGame() {
           });
           return;
         }
-        if (movedPiece === "p" && row === 7) movedPiece = "q";
-
-        const captured = newBoard[row][col];
-        if (captured && isWhite(captured)) {
-          setWhiteCaptured((prev) => [...prev, captured]);
+        if (movedPiece === "p" && row === 7) {
+          setPromotion({
+            from: [fromRow, fromCol],
+            to: [row, col],
+            color: "black",
+          });
+          return;
         }
-        if (captured && isBlack(captured)) {
-          setBlackCaptured((prev) => [...prev, captured]);
+
+        // 🎯 Capture
+        const captured = newBoard[row][col];
+        if (captured) {
+          if (isWhite(captured)) {
+            setWhiteCaptured((prev) => [...prev, captured]);
+          } else if (isBlack(captured)) {
+            setBlackCaptured((prev) => [...prev, captured]);
+          }
         }
 
         newBoard[row][col] = movedPiece;
         newBoard[fromRow][fromCol] = "";
-        const isBlackInCheck = isKingInCheck(newBoard, false);
-        if (isBlackInCheck) {
-          playCheckSoundWithFade(); // ✅ Play check sound if king is in check
-        } else if (captured) {
-          playCaptureSoundWithFade(); // 🔊 Play capture sound
-        } else {
-          playMoveSoundWithFade(); // 🔊 Play normal move sound
-        }
 
-        // ♜ Handle castling move: move the rook too
-        if (selectedPiece === "K" && fromCol === 4) {
-          // White kingside castling
+        // ♜ Castling
+        if ((selectedPiece === "K" || selectedPiece === "k") && fromCol === 4) {
+          // White kingside
           if (row === 7 && col === 6 && board[7][7] === "R") {
             newBoard[7][5] = "R";
             newBoard[7][7] = "";
           }
-          // White queen side castling
+          // White queenside
           if (row === 7 && col === 2 && board[7][0] === "R") {
             newBoard[7][3] = "R";
             newBoard[7][0] = "";
           }
+
+          // Black kingside
+          if (row === 0 && col === 6 && board[0][7] === "r") {
+            newBoard[0][5] = "r";
+            newBoard[0][7] = "";
+          }
+          // Black queenside
+          if (row === 0 && col === 2 && board[0][0] === "r") {
+            newBoard[0][3] = "r";
+            newBoard[0][0] = "";
+          }
         }
+
+        // 🔊 Sound Effects
+        const opponentIsWhite = turn === "black";
+        const opponentInCheck = isKingInCheck(newBoard, opponentIsWhite);
+
+        if (opponentInCheck) {
+          playCheckSoundWithFade();
+        } else if (captured) {
+          playCaptureSoundWithFade();
+        } else {
+          playMoveSoundWithFade();
+        }
+
+        // ♟️ Finalize move
         setBoard(newBoard);
         setSelected(null);
         setPossibleMoves([]);
 
-        if (captured === "k") {
-          setGameOver(true);
-          setWinner("White");
-        } else {
-          const isBlackInCheck = isKingInCheck(newBoard, false);
-          const blackLegalMoves = getAllLegalMovesSafe(newBoard, false);
+        // 🏁 Game Over Check
+        const opponentLegalMoves = getAllLegalMovesSafe(
+          newBoard,
+          opponentIsWhite
+        );
+        const opponentKing = opponentIsWhite ? "K" : "k";
 
-          if (isBlackInCheck && blackLegalMoves.length === 0) {
-            setGameOver(true);
-            setWinner("White"); // ✅ CHECKMATE
-          } else if (!isBlackInCheck && blackLegalMoves.length === 0) {
-            setGameOver(true);
-            setWinner("Draw"); // 🤝 STALEMATE
-          } else {
-            setTimeout(() => {
-              setTurn("black");
-              setCheck(isBlackInCheck);
-            }, 700);
-          }
+        if (captured === opponentKing) {
+          setGameOver(true);
+          setWinner(turn === "white" ? "White" : "Black");
+        } else if (opponentInCheck && opponentLegalMoves.length === 0) {
+          setGameOver(true);
+          setWinner(turn === "white" ? "White" : "Black");
+        } else if (!opponentInCheck && opponentLegalMoves.length === 0) {
+          setGameOver(true);
+          setWinner("Draw");
+        } else {
+          setTimeout(() => {
+            setTurn(opponentIsWhite ? "white" : "black");
+            setCheck(opponentInCheck);
+          }, 700);
         }
         return;
       }
+
+      // ❌ Invalid move click
       setSelected(null);
       setPossibleMoves([]);
     } else {
-      if ((playerSide === "white" && isWhite(piece)) || (playerSide === "black" && isBlack(piece))) {
-        const legal = getLegalMovesFiltered(board, row, col, true);
+      // ✅ First Click: Select only own piece
+      if (
+        (turn === "white" && isWhite(piece)) ||
+        (turn === "black" && isBlack(piece))
+      ) {
+        // ✅ FIXED: Use actual turn
+        const legal = getLegalMovesFiltered(board, row, col, turn === "white");
         setSelected([row, col]);
         setPossibleMoves(legal);
       }
@@ -224,6 +268,11 @@ export default function ChessGame() {
     setBlackCaptured([]);
     setHistory([]);
   };
+  useEffect(() => {
+    if (playerSide === "black") {
+      setTurn("white"); // Let bot start
+    }
+  }, []);
 
   useEffect(() => {
     if (justUndone) {
@@ -231,11 +280,13 @@ export default function ChessGame() {
       return;
     }
 
-    if (turn === "black" && !gameOver) {
+    // Bot's turn
+    if (turn !== playerSide && !gameOver) {
       setThinking(true);
 
       setTimeout(() => {
-        const { move } = minimaxRoot(board, depth, false);
+        const isBotWhite = playerSide === "black";
+        const { move } = minimaxRoot(board, depth, isBotWhite);
         if (!move) {
           setThinking(false);
           return;
@@ -244,17 +295,27 @@ export default function ChessGame() {
         const newBoard = board.map((r) => [...r]);
         let movedPiece = newBoard[move.from[0]][move.from[1]];
 
-        if (movedPiece === "p" && move.to[0] === 7) {
-          movedPiece = "q";
+        // Handle promotion
+        if (
+          (isBotWhite && movedPiece === "P" && move.to[0] === 0) ||
+          (!isBotWhite && movedPiece === "p" && move.to[0] === 7)
+        ) {
+          movedPiece = isBotWhite ? "Q" : "q";
         }
 
         const captured = newBoard[move.to[0]][move.to[1]];
-        if (captured && isWhite(captured)) {
-          setWhiteCaptured((prev) => [...prev, captured]);
+        if (captured) {
+          if (isBotWhite && isBlack(captured)) {
+            setBlackCaptured((prev) => [...prev, captured]);
+          } else if (!isBotWhite && isWhite(captured)) {
+            setWhiteCaptured((prev) => [...prev, captured]);
+          }
         }
 
         newBoard[move.to[0]][move.to[1]] = movedPiece;
         newBoard[move.from[0]][move.from[1]] = "";
+
+        // Save history
         setHistory((prev) => [
           ...prev,
           {
@@ -263,13 +324,15 @@ export default function ChessGame() {
             blackCaptured: [...blackCaptured],
           },
         ]);
+
         setBoard(newBoard);
 
-        const isWhiteInCheck = isKingInCheck(newBoard, true);
-        const whiteLegalMoves = getAllLegalMovesSafe(newBoard, true);
+        const isPlayerWhite = playerSide === "white";
+        const playerInCheck = isKingInCheck(newBoard, isPlayerWhite);
+        const playerLegalMoves = getAllLegalMovesSafe(newBoard, isPlayerWhite);
 
-        // 🔊 Add sound based on condition
-        if (isWhiteInCheck) {
+        // Sound effects
+        if (playerInCheck) {
           playCheckSoundWithFade();
         } else if (captured) {
           playCaptureSoundWithFade();
@@ -277,10 +340,11 @@ export default function ChessGame() {
           playMoveSoundWithFade();
         }
 
-        if (whiteLegalMoves.length === 0) {
-          if (isWhiteInCheck) {
+        // Game Over?
+        if (playerLegalMoves.length === 0) {
+          if (playerInCheck) {
             setGameOver(true);
-            setWinner("Black");
+            setWinner(isBotWhite ? "White" : "Black");
           } else {
             setGameOver(true);
             setWinner("Draw");
@@ -289,8 +353,9 @@ export default function ChessGame() {
           return;
         }
 
-        setTurn("white");
-        setCheck(isWhiteInCheck);
+        // Player's turn
+        setTurn(playerSide);
+        setCheck(playerInCheck);
         setThinking(false);
       }, 900);
     }
@@ -352,38 +417,57 @@ export default function ChessGame() {
 
             {/* Main board */}
             <div
-              className={`board transition duration-300 ${
-                thinking ? "blur-[1px] brightness-90" : ""
-              }`}
+              className={`board ${playerSide === "black" ? "rotate-180" : ""}`}
             >
-             
-              {board.map((row, rowIndex) =>
-                row.map((piece, colIndex) => {
-                  const selectedClass =
-                    selected?.[0] === rowIndex && selected?.[1] === colIndex
-                      ? "selected"
-                      : "";
-                  const possibleMoveClass = possibleMoves.some(
-                    ([r, c]) => r === rowIndex && c === colIndex
-                  )
-                    ? "possible-move"
-                    : "";
-                  const squareColor =
-                    (rowIndex + colIndex) % 2 === 0 ? "light" : "dark";
-                  const isChecked =
-                    piece === (turn === "white" ? "K" : "k") && check;
-                  const checkClass = isChecked ? "check" : "";
+              {(playerSide === "black" ? [...board].reverse() : board).map(
+                (row, rowIndexOriginal) => {
+                  const rowIndex =
+                    playerSide === "black"
+                      ? 7 - rowIndexOriginal
+                      : rowIndexOriginal;
 
                   return (
-                    <div
-                      key={`${rowIndex}-${colIndex}`}
-                      className={`square ${squareColor} ${selectedClass} ${possibleMoveClass} ${checkClass}`}
-                      onClick={() => handleClick(rowIndex, colIndex)}
-                    >
-                      {piece && <img src={pieceIcons[piece]} alt={piece} />}
-                    </div>
-                  );
-                })
+                    playerSide === "black" ? [...row].reverse() : row
+                  ).map((piece, colIndexOriginal) => {
+                    const colIndex =
+                      playerSide === "black"
+                        ? 7 - colIndexOriginal
+                        : colIndexOriginal;
+
+                    const selectedClass =
+                      selected?.[0] === rowIndex && selected?.[1] === colIndex
+                        ? "selected"
+                        : "";
+
+                    const possibleMoveClass = possibleMoves.some(
+                      ([r, c]) => r === rowIndex && c === colIndex
+                    )
+                      ? "possible-move"
+                      : "";
+
+                    const squareColor =
+                      (rowIndex + colIndex) % 2 === 0 ? "light" : "dark";
+                    const isChecked =
+                      piece === (turn === "white" ? "K" : "k") && check;
+                    const checkClass = isChecked ? "check" : "";
+
+                    return (
+                      <div
+                        key={`${rowIndex}-${colIndex}`}
+                        className={`square ${squareColor} ${selectedClass} ${possibleMoveClass} ${checkClass}`}
+                        onClick={() => handleClick(rowIndex, colIndex)}
+                      >
+                        {piece && (
+                          <img
+                            src={pieceIcons[piece]}
+                            alt={piece}
+                            draggable={false}
+                          />
+                        )}
+                      </div>
+                    );
+                  });
+                }
               )}
             </div>
 
@@ -399,7 +483,6 @@ export default function ChessGame() {
               ))}
             </div>
           </div>
-
           {thinking && (
             <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
               <div className="text-white text-5xl font-extrabold tracking-wider drop-shadow-md animate-pulse">
